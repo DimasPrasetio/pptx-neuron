@@ -34,6 +34,12 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
     nodes: [{ id: 'w', title: 'Aplikasi pemindai', tag: 'Kontainer · React', desc: 'Pindai & cari barang', col: 1, row: 0 },
       { id: 'a', title: 'API inventori', tag: 'Kontainer · Go', desc: 'Aturan stok dan opname', kind: 'main', col: 1, row: 1 },
       { id: 'd', title: 'Basis data', tag: 'Kontainer · MySQL', kind: 'db', col: 1, row: 2 }] }), /isi simpul .* tidak muat/, 'C4 3 baris berisi panjang');
+  // judul yang terbungkus lebih dari perkiraan jumlah huruf (huruf kapital, batas kata) pada 3 baris + sumber: harus ditolak
+  for (const [title, tag] of [['API GUDANG WMS', 'Go'], ['Aplikasi pemindai gudang', undefined]]) {
+    throws(() => T.createDeck({}).architecture({ title: 'x', caption: 'c', boundary: { label: 'b', cols: [1, 2] }, source: 's',
+      nodes: [{ id: 'w', title: 'Web', tag: 'React', col: 1, row: 0 }, { id: 'a', title, tag, kind: 'main', col: 1, row: 1 }, { id: 'd', title: 'DB', kind: 'db', col: 1, row: 2 }] }),
+    /tidak muat/, `judul "${title}" meluap harus ditolak`);
+  }
   // C4 3 baris dengan tag di SEMUA simpul (termasuk silinder basis data), dengan dan tanpa sumber: harus diterima
   for (const source of [undefined, 'Sumber: uji']) {
     const dd = T.createDeck({});

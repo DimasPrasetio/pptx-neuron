@@ -28,12 +28,34 @@ function build(ctx) {
   const LH = 1.15;
   // bantalan atas: silinder (preset can) punya tutup elips setinggi 25% sisi terpendek → teks mulai di tengah tutup
   const padTop = (kind, w, h) => (kind === 'db' ? Math.min(0.14, 0.125 * Math.min(w, h) + 0.04) : 0.06);
+  // Jumlah baris dengan pembungkusan PER KATA memakai tabel lebar huruf Arial (biasa/tebal)
+  // — lebih tepat daripada perkiraan jumlah huruf untuk teks pendek di kotak sempit.
+  const wrapLines = (text, wIn, pt, bold = false) => {
+    // lebar huruf Arial (em) biasa / tebal
+    const R = { ' ': 0.278, i: 0.222, l: 0.222, j: 0.222, f: 0.278, t: 0.278, r: 0.333, m: 0.833, w: 0.722, I: 0.278, M: 0.833, W: 0.944, '.': 0.278, ',': 0.278, ':': 0.278, '·': 0.278, '[': 0.278, ']': 0.278, '(': 0.333, ')': 0.333, '&': 0.667, '/': 0.278, '-': 0.333 };
+    const B = { ' ': 0.278, i: 0.278, l: 0.278, j: 0.278, f: 0.333, t: 0.333, r: 0.389, m: 0.889, w: 0.778, I: 0.278, M: 0.833, W: 0.944, '.': 0.278, ',': 0.278, ':': 0.333, '·': 0.278, '[': 0.333, ']': 0.333, '(': 0.333, ')': 0.333, '&': 0.722, '/': 0.278, '-': 0.333 };
+    const cw = (ch) => {
+      const t = bold ? B : R;
+      const em = ch in t ? t[ch]
+        : /[EPSXYZ]/.test(ch) ? 0.667 : /[FTL]/.test(ch) ? (bold ? 0.611 : 0.556) : /[A-Z]/.test(ch) ? 0.722
+        : /[0-9]/.test(ch) ? 0.556 : /[aceksvxyz]/.test(ch) ? (bold ? 0.556 : 0.5) : bold ? 0.611 : 0.556;
+      return em * pt / 72;
+    };
+    const width = (str) => [...str].reduce((a, ch) => a + cw(ch), 0);
+    let n = 1, cur = 0;
+    for (const word of plain(text).split(/\s+/).filter(Boolean)) {
+      const ww = width(word);
+      if (cur === 0) cur = ww; else if (cur + cw(' ') + ww <= wIn) cur += cw(' ') + ww; else { n++; cur = ww; }
+      while (cur > wIn) { n++; cur -= wIn; }   // kata lebih panjang dari baris
+    }
+    return n;
+  };
   const nodeNeed = ({ w, h, title, tag, desc, kind }) => padTop(kind, w, h)
-    + (lines(title, w - 0.16, V.node, true) * V.node * LH + (tag ? lines(`[${tag}]`, w - 0.16, V.tag) * V.tag * LH : 0)
-      + (desc ? lines(desc, w - 0.16, V.tag) * V.tag * LH : 0)) / 72;
+    + (wrapLines(title, w - 0.16, V.node, true) * V.node * LH + (tag ? wrapLines(`[${tag}]`, w - 0.16, V.tag) * V.tag * LH : 0)
+      + (desc ? wrapLines(desc, w - 0.16, V.tag) * V.tag * LH : 0)) / 72;
   // Simpul: kotak dengan judul + (tag) + deskripsi. kind: 'node' | 'main' | 'external' | 'person' | 'db'
   function node(s, { x, y, w, h, title, tag, desc, kind = 'node', focus = false, name = 'diagram-simpul', alt }) {
-    if (nodeNeed({ w, title, tag, desc, kind }) > h + 0.02) warn(`diagram: isi simpul "${plain(title)}" diperkirakan tidak muat (${h.toFixed(2)}") — persingkat judul/deskripsi.`);
+    if (nodeNeed({ w, h, title, tag, desc, kind }) > h + 0.02) warn(`diagram: isi simpul "${plain(title)}" diperkirakan tidak muat (${h.toFixed(2)}") — persingkat judul/deskripsi.`);
     const dark = kind === 'main';
     const fill = dark ? INK : kind === 'external' ? WHITE : ZEBRA;
     const line = kind === 'external' ? { color: GREY, width: 1 } : focus ? { color: ACC, width: 1.5 } : { type: 'none' };
