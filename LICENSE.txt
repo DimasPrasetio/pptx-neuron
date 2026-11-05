@@ -8,3 +8,4 @@ presentasi di luar Neuronworks Indonesia.
 Komponen pihak ketiga yang dibundel tetap tunduk pada lisensinya masing-masing:
 - scripts/vendor/pptxgenjs.bundle.cjs (pustaka pptxgenjs dan dependensinya): lihat THIRD_PARTY_NOTICES.txt
 - scripts/office/, add_slide.py, clean.py, slide_text.py, thumbnail.py, apply_theme.js: berasal dari skill pptx Anthropic
+  (apply_theme.js disesuaikan agar memakai jszip dari bundel)

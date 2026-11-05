@@ -1,8 +1,9 @@
 // Desain presentasi Neuron (PowerPoint 16:9).
 // Hanya DESAIN: warna, huruf, tata letak, logo, motif Tiga Goresan, footer. Isi slide selalu dari pemanggil.
-// Token sama persis dengan docx-neuron/scripts/neuron_theme.js; tata letak dari brief desain (riset 2026-11-05).
+// Token sama persis dengan docx-neuron/scripts/neuron_theme.js; tata letak dari brief desain (riset 2026-11-05,
+// revisi skala huruf 2026-11-05: judul aksi 22 pt, isi 14 pt).
 //
-// TAHAP RANCANGAN: baru 3 jenis slide (sampul, isi poin, tabel). Tujuh jenis lain menyusul di Konstruksi.
+// Sepuluh jenis slide: cover, agenda, section, bullets, twoColumn, table, chart, image, stats, closing.
 const fs = require('fs');
 const path = require('path');
 // pptxgenjs dibundel di scripts/vendor (tanpa npm install). Bila bundel hilang, jatuh ke paket terpasang.
@@ -17,22 +18,25 @@ const LOGO_RATIO = 612 / 176;   // 3,477 : 1 — jangan diregangkan; latar logo 
 const LOGO_PAD = { l: 0.0441, r: 0.0866, t: 0.2273, b: 0.1989 };
 
 // ---------- token desain (sama dengan docx-neuron) ----------
-const ACC = 'B3121B';       // merah logo: label bab, Tiga Goresan, sorotan data (maks. 2 elemen per slide isi)
+const ACC = 'B3121B';       // merah logo: label bab, Tiga Goresan, sorotan data (maks. 2 elemen merah per slide isi)
 const ACC_DARK = '7F0D14';  // turunan B3121B x 0,71: hanya goresan ke-2 motif
 const INK = '1F2937';       // judul; latar pembatas bab
 const MUTED = '5B6470';     // sekunder: sumber, footer, keterangan
 const TEXT = '111111';      // teks isi
-const RULE = 'C9CDD3';      // garis tabel/grafik (bukan teks di latar terang)
+const RULE = 'C9CDD3';      // garis tabel/grafik; teks hanya di latar gelap
 const HEAD_FILL = '2B3440'; // header tabel
-const ZEBRA = 'F4F5F7';     // baris selang-seling, panel "Inti"
+const ZEBRA = 'F4F5F7';     // baris selang-seling, panel
+const GREY = '8C939D';      // turunan: seri pembanding grafik (bukan teks)
 const WHITE = 'FFFFFF';
 const FONT = 'Arial';
 const LANG = 'id-ID';
+// Urutan warna seri grafik: seri fokus merah, sisanya gelap → abu (maks. 4 seri; lebih → gabung "Lainnya").
+const SERIES = [ACC, INK, GREY, MUTED];
 
 // Tema PowerPoint (pemilih warna di PowerPoint menampilkan palet Neuron).
 const THEME = {
   name: 'Neuron', headFontFace: FONT, bodyFontFace: FONT,
-  colors: { dk1: TEXT, lt1: WHITE, dk2: INK, lt2: ZEBRA, accent1: ACC, accent2: INK, accent3: MUTED, accent4: '8C939D',
+  colors: { dk1: TEXT, lt1: WHITE, dk2: INK, lt2: ZEBRA, accent1: ACC, accent2: INK, accent3: MUTED, accent4: GREY,
     accent5: HEAD_FILL, accent6: ACC_DARK, hlink: ACC, folHlink: MUTED },
 };
 
@@ -41,15 +45,54 @@ const M = 0.5, W = 9.0, GAP = 0.3;
 const Z = { chapterY: 0.45, titleY: 0.72, titleH: 0.75, bodyY: 1.65, bodyEnd: 4.75, sourceY: 4.72, footerY: 5.12 };
 // Skala huruf (pt) pada kanvas 10". Setara x1,33 di kanvas lebar 13,33" — judul 22 pt ~ 29 pt, isi 14 pt ~ 19 pt.
 // Revisi 2026-11-05: skala v1 (judul 36, isi 16) dinilai pengguna terlalu besar / kurang profesional.
-const TYPE = { coverTitle: 30, title: 22, coverSub: 14, body: 14, key: 14, table: 12, tableDense: 11, label: 10,
+const TYPE = { coverTitle: 30, sectionNum: 40, sectionTitle: 28, title: 22, stat: 40, statOne: 54, keyValue: 32,
+  subhead: 15, coverSub: 14, body: 14, key: 14, table: 12, tableDense: 11, small: 11, chart: 10, label: 10,
   meta: 11, source: 9, footer: 9 };
-const col = (n) => n * 0.475 + (n - 1) * 0.3;   // lebar n kolom dari grid 12 kolom
+const col = (n) => n * 0.475 + (n - 1) * 0.3;          // lebar n kolom dari grid 12 kolom
+const colX = (start) => M + start * (0.475 + 0.3);      // x awal kolom ke-start (0..11)
 
 // ---------- helper teks ----------
+// Angka tidak dipisah dari satuannya di akhir baris ("Rp 101 jt", "14 bln"): spasi diganti spasi tak-putus.
+const nb = (s) => String(s).replace(/\bRp (?=\d)/g, 'Rp\u00A0')
+  .replace(/(\d) (?=(jt|juta|M|miliar|T|triliun|rb|ribu|bln|bulan|hari|minggu|menit|jam|tahun|thn|unit|orang|%)(?![\p{L}]))/gu, '$1\u00A0');
 // rich('teks **tebal** biasa', o): '**...**' menjadi tebal (sama seperti docx-neuron).
-const rich = (s, o = {}) => String(s).split('**').map((seg, k) => [seg, k % 2 === 1]).filter(([seg]) => seg !== '')
+const rich = (s, o = {}) => nb(s).split('**').map((seg, k) => [seg, k % 2 === 1]).filter(([seg]) => seg !== '')
   .map(([seg, bold]) => ({ text: seg, options: { ...o, bold: o.bold || bold } }));
+const plain = (s) => String(s).replace(/\*\*/g, '');
 const base = (o = {}) => ({ fontFace: FONT, lang: LANG, isTextBox: true, margin: 0, ...o });
+
+// Perkiraan kasar jumlah baris Arial (lebar rata-rata huruf 0,5 em; tebal 0,55 em). Hanya untuk PERINGATAN
+// teks meluap — verifikasi akhir tetap lewat render.
+const lines = (s, wIn, pt, bold = false) => Math.max(1, Math.ceil((plain(s).length * pt * (bold ? 0.55 : 0.5)) / 72 / wIn));
+const warn = (msg) => console.warn(`[neuron_theme] ${msg}`);
+function checkFit(kind, texts, wIn, pt, hIn, { spacing = 1.15, paraAfterPt = 8, bold = false } = {}) {
+  const n = texts.reduce((a, t) => a + lines(t, wIn, pt, bold), 0);
+  const need = (n * pt * 1.2 * spacing + Math.max(0, texts.length - 1) * paraAfterPt) / 72;
+  if (need > hIn) warn(`${kind}: teks diperkirakan ${need.toFixed(2)}" tinggi, ruang ${hIn.toFixed(2)}" — persingkat atau pecah slide.`);
+}
+function checkTitle(kind, t) {
+  if (lines(t, W, TYPE.title, true) > 2) warn(`${kind}: judul "${plain(t).slice(0, 40)}…" lebih dari 2 baris — persingkat (± 90 karakter).`);
+  if (/\.\s*$/.test(plain(t))) warn(`${kind}: judul diakhiri titik — hapus titiknya.`);
+}
+
+// Bullet: satu paragraf per poin. pptxgenjs memulai paragraf baru pada run ber-bullet, jadi hanya run pertama
+// poin yang membawa bullet; run terakhir menutup baris.
+const bulletRuns = (items, o = {}) => items.flatMap((b, i) => rich(b, o).map((r, k, arr) => ({ text: r.text,
+  options: { ...r.options, ...(k === 0 ? { bullet: { indent: 16 } } : {}), ...(k === arr.length - 1 && i < items.length - 1 ? { breakLine: true } : {}) } })));
+
+// Ukuran piksel gambar PNG atau JPEG (dibaca dari header berkas).
+function imageInfo(buf, file) {
+  if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) return { type: 'png', w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    for (let i = 2; i + 9 < buf.length;) {
+      if (buf[i] !== 0xff) { i++; continue; }
+      const m = buf[i + 1];
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { type: 'jpg', h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+      i += 2 + buf.readUInt16BE(i + 2);
+    }
+  }
+  throw new Error(`[neuron_theme] image: ${file} bukan PNG/JPEG yang valid.`);
+}
 
 // ---------- motif Tiga Goresan (dari simbol logo) ----------
 // Tiga jajaran genjang ramping condong ±20° (bawah-kiri -> atas-kanan). Dekoratif; dibuat terakhir (urutan baca).
@@ -57,31 +100,16 @@ function strokes(slide, { x, y, h, sw, colors, transparency = [0, 0, 0], name = 
   const slant = h * Math.tan((20 * Math.PI) / 180);
   const gap = sw * 0.6;
   colors.forEach((c, i) => {
-    const x0 = x + i * (sw + gap);
     slide.addShape('custGeom', {
-      x: x0, y, w: slant + sw, h, objectName: `${name}-${i + 1}`, altText: '',
+      x: x + i * (sw + gap), y, w: slant + sw, h, objectName: `${name}-${i + 1}`, altText: '',
       fill: { color: c, transparency: transparency[i] }, line: { type: 'none' },
       points: [{ x: 0, y: h }, { x: slant, y: 0 }, { x: slant + sw, y: 0 }, { x: sw, y: h }, { close: true }],
     });
   });
   return slant + 3 * sw + 2 * gap;   // lebar total
 }
-
-// Label bab merah 12 pt + Tiga Goresan mini: penanda posisi di deck (pengganti garis aksen Word).
-function chapterLabel(slide, text) {
-  if (!text) return;
-  slide.addText(text, base({ x: M + 0.24, y: Z.chapterY, w: 6, h: 0.22, fontSize: TYPE.label, bold: true, color: ACC, valign: 'middle',
-    objectName: 'label-bab' }));
-  slide._neuronMini = true;
-}
-const finishSlide = (slide) => {
-  if (slide._neuronMini) strokes(slide, { x: M, y: Z.chapterY + 0.03, h: 0.16, sw: 0.035, colors: [ACC, ACC_DARK, INK], name: 'motif-mini' });
-};
-
-function source(slide, text, y = Z.sourceY) {
-  if (!text) return;
-  slide.addText(text, base({ x: M, y, w: W, h: 0.2, fontSize: TYPE.source, color: MUTED, valign: 'top', objectName: 'sumber' }));
-}
+const MINI = { h: 0.16, sw: 0.035 };
+const miniStrokes = (slide, x, y, name = 'motif-mini') => strokes(slide, { x, y, ...MINI, colors: [ACC, ACC_DARK, INK], name });
 
 // pptxgenjs 4.0.1 menulis <a:pPr> untuk SETIAP run, sehingga paragraf ber-run banyak (mis. '**tebal**' di tengah
 // kalimat) berisi <a:pPr> di tengah paragraf: tidak sah menurut skema dan run berikutnya membawa <a:buNone/> yang
@@ -109,35 +137,67 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
 
   const titlePh = (o) => ({ placeholder: { options: { name: 'title', type: 'title', fontFace: FONT, bold: true, color: INK,
     valign: 'top', align: 'left', margin: 0, lang: LANG, lineSpacingMultiple: 0.9, ...o }, text: '' } });
-  // logoAt({ left | right, top | middle, w }): posisi berdasarkan tepi tinta logo.
-  const logoAt = ({ left, right, top, middle, w }) => {
+  // logoAt({ left | right, top | middle | bottom, w }): posisi berdasarkan tepi TINTA logo.
+  const logoAt = ({ left, right, top, middle, bottom, w }) => {
     const h = w / LOGO_RATIO;
     const x = left !== undefined ? left - LOGO_PAD.l * w : right - w + LOGO_PAD.r * w;
-    const y = top !== undefined ? top - LOGO_PAD.t * h : middle - ((LOGO_PAD.t + 1 - LOGO_PAD.b) / 2) * h;
+    const y = top !== undefined ? top - LOGO_PAD.t * h
+      : bottom !== undefined ? bottom - h + LOGO_PAD.b * h : middle - ((LOGO_PAD.t + 1 - LOGO_PAD.b) / 2) * h;
     return { image: { path: LOGO_PATH, x, y, w, h, altText: 'Logo Neuron' } };
   };
+  const footerText = footerLabel ? [{ text: { text: footerLabel, options: base({ x: M, y: Z.footerY, w: 5.5, h: 0.22, fontSize: TYPE.footer, color: MUTED, valign: 'middle' }) } }] : [];
+  const slideNo = (color) => ({ x: 7.75, y: Z.footerY, w: 0.6, h: 0.22, fontFace: FONT, fontSize: TYPE.footer, color, align: 'right' });
 
-  // Layout sampul: logo kiri atas, judul 40 pt.
+  // Layout (pptxgenjs menyebutnya "slide master"; di PowerPoint menjadi layout di bawah satu master).
   pres.defineSlideMaster({ title: 'NEURON_SAMPUL', background: { color: WHITE },
     objects: [logoAt({ left: M, top: M, w: 1.9 }), titlePh({ x: M, y: 2.1, w: 6.4, h: 1.0, fontSize: TYPE.coverTitle })] });
-  // Layout isi: judul aksi 36 pt di posisi tetap, footer label dokumen + nomor slide + logo kanan bawah.
-  pres.defineSlideMaster({ title: 'NEURON_ISI', background: { color: WHITE },
-    margin: [0.5, 0.5, 0.75, 0.5],
-    slideNumber: { x: 7.75, y: Z.footerY, w: 0.6, h: 0.22, fontFace: FONT, fontSize: TYPE.footer, color: MUTED, align: 'right' },
-    objects: [
-      titlePh({ x: M, y: Z.titleY, w: W, h: Z.titleH, fontSize: TYPE.title }),
-      ...(footerLabel ? [{ text: { text: footerLabel, options: base({ x: M, y: Z.footerY, w: 5.5, h: 0.22, fontSize: TYPE.footer, color: MUTED, valign: 'middle' }) } }] : []),
-      logoAt({ right: M + W, middle: Z.footerY + 0.11, w: 0.95 }),
-    ] });
+  pres.defineSlideMaster({ title: 'NEURON_ISI', background: { color: WHITE }, margin: [0.5, 0.5, 0.75, 0.5],
+    slideNumber: slideNo(MUTED),
+    objects: [titlePh({ x: M, y: Z.titleY, w: W, h: Z.titleH, fontSize: TYPE.title }), ...footerText,
+      logoAt({ right: M + W, middle: Z.footerY + 0.11, w: 0.95 })] });
+  // Pembatas bab: latar gelap, tanpa logo (logo berlatar putih opak), tanpa label dokumen.
+  pres.defineSlideMaster({ title: 'NEURON_BAB', background: { color: INK }, slideNumber: { ...slideNo(RULE), x: M, align: 'left' },
+    objects: [titlePh({ x: M, y: 2.35, w: 6.2, h: 1.0, fontSize: TYPE.sectionTitle, color: WHITE })] });
+  // Penutup: latar putih, judul di posisi slide isi, logo besar kanan bawah, tanpa footer.
+  pres.defineSlideMaster({ title: 'NEURON_PENUTUP', background: { color: WHITE },
+    objects: [titlePh({ x: M, y: Z.titleY, w: W, h: Z.titleH, fontSize: TYPE.title }),
+      logoAt({ right: M + W, bottom: 5.0, w: 1.7 })] });
 
-  const slides = [];
-  const add = (masterName, notes) => { const s = pres.addSlide({ masterName }); if (notes) s.addNotes(notes); slides.push(s); return s; };
+  // Bagian PowerPoint (sections): slide pertama masuk "Pembuka"; section() membuka bagian baru; closing() "Penutup".
+  let sections = 0;
+  const openSection = (t) => { pres.addSection({ title: plain(t) }); sections++; };
+  const add = (masterName, notes) => {
+    if (!sections) openSection('Pembuka');
+    const s = pres.addSlide({ masterName });
+    if (notes) s.addNotes(notes);
+    return s;
+  };
+  // Kepala slide isi: label bab (merah + goresan mini) dan judul aksi di placeholder judul.
+  const head = (s, kind, chapter, t) => {
+    checkTitle(kind, t);
+    if (chapter) s.addText(chapter, base({ x: M + 0.24, y: Z.chapterY, w: 6, h: 0.22, fontSize: TYPE.label, bold: true, color: ACC,
+      valign: 'middle', objectName: 'label-bab' }));
+    s.addText(nb(t), { placeholder: 'title' });
+    s._mini = !!chapter;
+  };
+  const finish = (s) => { if (s._mini) miniStrokes(s, M, Z.chapterY + 0.03); return s; };
+  const source = (s, text, y = Z.sourceY) => {
+    if (text) s.addText(text, base({ x: M, y, w: W, h: 0.2, fontSize: TYPE.source, color: MUTED, valign: 'top', objectName: 'sumber' }));
+  };
+  const bottomOf = (src) => (src ? Z.sourceY - 0.2 : Z.bodyEnd);
+  const bulletBox = (s, kind, items, x, y, w, h, o = {}) => {
+    if (items.length > 5) warn(`${kind}: ${items.length} poin; maksimal 5 per blok — pecah slide.`);
+    checkFit(kind, items, w - 0.25, TYPE.body, h);
+    s.addText(bulletRuns(items), base({ x, y, w, h, fontSize: TYPE.body, color: TEXT, valign: 'top', paraSpaceAfter: 8,
+      lineSpacingMultiple: 1.15, ...o }));
+  };
 
   const api = {
     pres,
     // 1. Sampul — "Apa ini, untuk siapa, dari siapa?"
     cover({ type = '', title: t, subtitle = '', meta = '', classification = '', notes } = {}) {
       const s = add('NEURON_SAMPUL', notes);
+      if (lines(t, 6.4, TYPE.coverTitle, true) > 2) warn(`cover: judul lebih dari 2 baris — persingkat.`);
       if (type) s.addText(String(type).toUpperCase(), base({ x: M, y: 1.8, w: 6.4, h: 0.22, fontSize: TYPE.label, bold: true, color: ACC, charSpacing: 1.5, valign: 'middle', objectName: 'jenis-dokumen' }));
       s.addText(t, { placeholder: 'title' });
       if (subtitle) s.addText(subtitle, base({ x: M, y: 3.25, w: 6.0, h: 0.5, fontSize: TYPE.coverSub, color: MUTED, valign: 'top', objectName: 'subjudul' }));
@@ -146,39 +206,81 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
       strokes(s, { x: 7.35, y: 1.0, h: 3.6, sw: 0.16, colors: [ACC, ACC_DARK, INK], name: 'motif-sampul' });
       return s;
     },
-    // 4. Isi poin — "Apa kesimpulannya dan apa 3–5 alasannya?" Panel Inti kanan opsional.
-    bullets({ chapter, title: t, bullets = [], keyPoint, source: src, notes } = {}) {
-      if (bullets.length > 5) console.warn(`[neuron_theme] bullets: ${bullets.length} poin; maksimal 5 per slide — pecah slide.`);
+
+    // 2. Agenda — "Apa saja yang dibahas dan sekarang di mana?" items: string | { text, note }; active: indeks butir aktif.
+    agenda({ chapter = 'Agenda', title: t = 'Yang akan dibahas', items = [], active, notes } = {}) {
+      if (items.length > 6) warn(`agenda: ${items.length} butir; maksimal 6.`);
       const s = add('NEURON_ISI', notes);
-      chapterLabel(s, chapter);
+      head(s, 'agenda', chapter, t);
+      const rowH = 0.46;
+      items.forEach((it, i) => {
+        const { text, note } = typeof it === 'string' ? { text: it } : it;
+        const y = Z.bodyY + i * rowH, on = active === i, dim = active !== undefined && !on;
+        s.addText(String(i + 1).padStart(2, '0'), base({ x: M, y, w: 0.6, h: rowH, fontSize: TYPE.subhead, bold: true, color: dim ? MUTED : INK, valign: 'middle', objectName: `agenda-no-${i + 1}` }));
+        s.addText(plain(text), base({ x: M + 0.95, y, w: 6.2, h: rowH, fontSize: TYPE.body, bold: on, color: dim ? MUTED : TEXT, valign: 'middle', objectName: `agenda-${i + 1}` }));
+        if (note) s.addText(note, base({ x: M + 7.3, y, w: 1.7, h: rowH, fontSize: TYPE.small, color: MUTED, align: 'right', valign: 'middle', objectName: `agenda-ket-${i + 1}` }));
+        // garis rambut antarbaris: pemisah tabel-daftar, bukan garis aksen
+        if (i < items.length - 1) s.addShape('line', { x: M, y: y + rowH, w: W, h: 0, line: { color: RULE, width: 0.75 }, objectName: `agenda-garis-${i + 1}` });
+      });
+      if (active !== undefined && items[active] !== undefined) miniStrokes(s, M + 0.5, Z.bodyY + active * rowH + (rowH - MINI.h) / 2, 'motif-agenda');
+      return finish(s);
+    },
+
+    // 3. Pembatas bab — "Bagian baru dimulai: apa?" Latar gelap, nomor besar, goresan merah memudar.
+    section({ number = '', title: t, description = '', notes } = {}) {
+      openSection(t);
+      const s = add('NEURON_BAB', notes);
+      if (number !== '') s.addText(String(number), base({ x: M, y: 1.35, w: 3, h: 0.8, fontSize: TYPE.sectionNum, bold: true, color: WHITE, valign: 'bottom', objectName: 'nomor-bab' }));
       s.addText(t, { placeholder: 'title' });
-      const textW = keyPoint ? col(8) : W;   // grid 8 + 4: baris poin cukup panjang agar jarang terbungkus
-      const bottom = src ? Z.sourceY - GAP : Z.bodyEnd;
-      // Satu paragraf per poin: semua run poin membawa bullet yang sama; run terakhir menutup baris.
-      // pptxgenjs memulai paragraf baru pada run ber-bullet: hanya run pertama poin yang membawa bullet.
-      const items = bullets.flatMap((b, i) => rich(b).map((r, k, arr) => ({ text: r.text,
-        options: { ...r.options, ...(k === 0 ? { bullet: { indent: 18 } } : {}), ...(k === arr.length - 1 && i < bullets.length - 1 ? { breakLine: true } : {}) } })));
-      s.addText(items,
-        base({ x: M, y: Z.bodyY, w: textW, h: bottom - Z.bodyY, fontSize: TYPE.body, color: TEXT, valign: 'top', paraSpaceAfter: 8,
-          lineSpacingMultiple: 1.15, objectName: 'poin' }));
-      if (keyPoint) {
-        const px = M + col(8) + GAP;
-        s.addShape('rect', { x: px, y: Z.bodyY, w: col(4), h: bottom - Z.bodyY, fill: { color: ZEBRA }, line: { type: 'none' }, objectName: 'panel-inti' });
-        s.addText([{ text: 'Inti', options: { fontSize: TYPE.label, bold: true, color: MUTED, breakLine: true } },
-          ...rich(keyPoint, { fontSize: TYPE.key, bold: true, color: INK })],
-          base({ x: px + 0.22, y: Z.bodyY + 0.22, w: col(4) - 0.44, h: bottom - Z.bodyY - 0.44, valign: 'top', paraSpaceAfter: 6, lineSpacingMultiple: 1.15, objectName: 'inti' }));
-      }
-      source(s, src);
-      finishSlide(s);
+      if (description) s.addText(description, base({ x: M, y: 3.45, w: 6.0, h: 0.7, fontSize: TYPE.body, color: RULE, valign: 'top', lineSpacingMultiple: 1.15, objectName: 'deskripsi-bab' }));
+      strokes(s, { x: 7.35, y: 1.0, h: 3.6, sw: 0.16, colors: [ACC, ACC, ACC], transparency: [0, 35, 60], name: 'motif-bab' });
       return s;
     },
-    // 6. Tabel — "Bagaimana perbandingan angka/atribut ini?" Header 2B3440, zebra F4F5F7, garis horizontal saja.
-    table({ chapter, title: t, caption, head, rows, align = [], widths, source: src, notes } = {}) {
-      const maxRows = caption ? 7 : 8;
-      if (rows.length > maxRows) console.warn(`[neuron_theme] table: ${rows.length} baris; maksimal ${maxRows} per slide — pecah ke slide "(lanjutan)".`);
+
+    // 4. Isi poin — "Apa kesimpulannya dan apa 3–5 alasannya?" Panel Inti kanan opsional.
+    bullets({ chapter, title: t, bullets = [], keyPoint, source: src, notes } = {}) {
       const s = add('NEURON_ISI', notes);
-      chapterLabel(s, chapter);
-      s.addText(t, { placeholder: 'title' });
+      head(s, 'bullets', chapter, t);
+      const bottom = bottomOf(src);
+      bulletBox(s, 'bullets', bullets, M, Z.bodyY, keyPoint ? col(8) : W, bottom - Z.bodyY, { objectName: 'poin' });
+      if (keyPoint) {
+        const px = colX(8), pw = col(4);
+        checkFit('bullets.keyPoint', [keyPoint], pw - 0.44, TYPE.key, bottom - Z.bodyY - 0.75, { bold: true });
+        s.addShape('rect', { x: px, y: Z.bodyY, w: pw, h: bottom - Z.bodyY, fill: { color: ZEBRA }, line: { type: 'none' }, objectName: 'panel-inti' });
+        s.addText([{ text: 'Inti', options: { fontSize: TYPE.label, bold: true, color: MUTED, breakLine: true } },
+          ...rich(keyPoint, { fontSize: TYPE.key, bold: true, color: INK })],
+          base({ x: px + 0.22, y: Z.bodyY + 0.22, w: pw - 0.44, h: bottom - Z.bodyY - 0.44, valign: 'top', paraSpaceAfter: 6, lineSpacingMultiple: 1.15, objectName: 'inti' }));
+      }
+      source(s, src);
+      return finish(s);
+    },
+
+    // 5. Dua kolom — "Apa bedanya A dan B?" left/right: { heading, bullets }; recommend: 'left' | 'right'.
+    twoColumn({ chapter, title: t, left = {}, right = {}, recommend, source: src, notes } = {}) {
+      const s = add('NEURON_ISI', notes);
+      head(s, 'twoColumn', chapter, t);
+      const bottom = bottomOf(src), cw = col(6);
+      [['left', left, M], ['right', right, colX(6)]].forEach(([side, c, x]) => {
+        const rec = recommend === side, pad = rec ? 0.22 : 0;
+        if (rec) s.addShape('rect', { x, y: Z.bodyY, w: cw, h: bottom - Z.bodyY, fill: { color: ZEBRA }, line: { type: 'none' }, objectName: `panel-${side}` });
+        if (rec) s.addText('Rekomendasi', base({ x: x + pad, y: Z.bodyY + 0.22, w: cw - 2 * pad, h: 0.2, fontSize: TYPE.label, bold: true, color: ACC, valign: 'middle', objectName: `rekomendasi-${side}` }));
+        // subjudul kedua kolom sejajar: kolom tanpa panel ikut turun setinggi label "Rekomendasi"
+        let y = Z.bodyY + (recommend ? 0.48 : 0);
+        if (c.heading) { s.addText(c.heading, base({ x: x + pad, y, w: cw - 2 * pad, h: 0.3, fontSize: TYPE.subhead, bold: true, color: INK, valign: 'top', objectName: `subjudul-${side}` })); y += 0.45; }
+        bulletBox(s, `twoColumn.${side}`, c.bullets || [], x + pad, y, cw - 2 * pad, bottom - y - pad, { objectName: `poin-${side}` });
+      });
+      source(s, src);
+      return finish(s);
+    },
+
+    // 6. Tabel — "Bagaimana perbandingan angka/atribut ini?" Header 2B3440, zebra F4F5F7, garis horizontal saja.
+    table({ chapter, title: t, caption, head: hd, rows = [], align = [], widths, source: src, notes } = {}) {
+      const maxRows = caption ? 7 : 8;
+      if (rows.length > maxRows) warn(`table: ${rows.length} baris; maksimal ${maxRows} per slide — pecah ke slide "(lanjutan)" dengan header yang sama.`);
+      if (widths && Math.abs(widths.reduce((a, b) => a + b, 0) - W) > 0.01) warn(`table: jumlah lebar kolom ${widths.reduce((a, b) => a + b, 0)}", seharusnya ${W}".`);
+      if (widths && widths.length !== hd.length) throw new Error(`[neuron_theme] table: ${hd.length} kolom header tetapi ${widths.length} lebar.`);
+      const s = add('NEURON_ISI', notes);
+      head(s, 'table', chapter, t);
       let y = Z.bodyY;
       if (caption) {
         const [label, ...rest] = String(caption).split(' · ');
@@ -186,22 +288,149 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
           base({ x: M, y, w: W, h: 0.22, fontSize: TYPE.label, color: INK, valign: 'middle', objectName: 'judul-tabel' }));
         y += 0.3;
       }
-      const fs_ = head.length > 5 || rows.length > 6 ? TYPE.tableDense : TYPE.table;
+      const fsz = hd.length > 5 || rows.length > 6 ? TYPE.tableDense : TYPE.table;
       const hair = { type: 'solid', pt: 0.5, color: RULE }, none = { type: 'none' };
       const al = (i) => (align[i] === 'r' ? 'right' : align[i] === 'c' ? 'center' : 'left');
       const cell = (txt, i, isHead, zebra) => ({
-        text: isHead ? String(txt) : rich(txt, {}),
-        options: { fontFace: FONT, lang: LANG, fontSize: fs_, bold: isHead, color: isHead ? WHITE : TEXT, align: isHead && align[i] !== 'r' ? 'left' : al(i),
+        text: isHead ? plain(txt) : rich(txt, {}),
+        options: { fontFace: FONT, lang: LANG, fontSize: fsz, bold: isHead, color: isHead ? WHITE : TEXT, align: al(i),
           valign: 'middle', fill: { color: isHead ? HEAD_FILL : zebra ? ZEBRA : WHITE }, margin: [0, 0.1, 0, 0.1],
           border: [isHead ? none : hair, none, hair, none] },
       });
-      const colW = widths || head.map(() => W / head.length);
-      s.addTable([head.map((h, i) => cell(h, i, true)), ...rows.map((r, ri) => r.map((c, i) => cell(c, i, false, ri % 2 === 1)))],
-        { x: M, y, w: W, colW, rowH: 0.32, autoPage: false, objectName: 'tabel' });
-      source(s, src, Math.min(Z.sourceY, y + (rows.length + 1) * 0.32 + 0.12));   // sumber menempel di bawah tabel
-      finishSlide(s);
-      return s;
+      const rowH = 0.32;
+      s.addTable([hd.map((h, i) => cell(h, i, true)), ...rows.map((r, ri) => r.map((c, i) => cell(c, i, false, ri % 2 === 1)))],
+        { x: M, y, w: W, colW: widths || hd.map(() => W / hd.length), rowH, autoPage: false, objectName: 'tabel' });
+      source(s, src, Math.min(Z.sourceY, y + (rows.length + 1) * rowH + 0.12));   // sumber menempel di bawah tabel
+      return finish(s);
     },
+
+    // 7. Grafik — "Tren/perbandingan apa yang harus dilihat?" Grafik native (bisa diedit di PowerPoint).
+    // type: 'column' | 'bar' | 'line' | 'doughnut'; series: [{ name, values }]; focus: indeks seri merah
+    // (bawaan: seri 0 bila > 1 seri; satu seri tetap gelap agar merah hemat). keyValue/keyText: panel angka kanan.
+    chart({ chapter, title: t, type = 'column', labels = [], series = [], focus, keyValue, keyText, numFmt = '#,##0',
+      showValue = true, source: src, notes } = {}) {
+      if (series.length > 4) warn(`chart: ${series.length} seri; maksimal 4 — gabung ke "Lainnya" atau pecah grafik.`);
+      const s = add('NEURON_ISI', notes);
+      head(s, 'chart', chapter, t);
+      const bottom = bottomOf(src);
+      const panel = keyValue !== undefined || keyText;
+      const cw = panel ? col(8) : W;
+      const f = focus !== undefined ? focus : series.length > 1 ? 0 : -1;
+      const others = SERIES.slice(1);
+      const colors = series.map((_, i) => (i === f ? ACC : others[(f >= 0 && i > f ? i - 1 : i) % others.length]));
+      const PT = { bar: 'bar', column: 'bar', line: 'line', doughnut: 'doughnut' }[type];
+      if (!PT) throw new Error(`[neuron_theme] chart: type '${type}' tidak dikenal (column, bar, line, doughnut).`);
+      const data = series.map((sr) => ({ name: sr.name, labels, values: sr.values }));
+      const axis = { color: MUTED, fontFace: FONT, fontSize: TYPE.chart };
+      const opts = {
+        x: M, y: Z.bodyY, w: cw, h: bottom - Z.bodyY, objectName: 'grafik', altText: plain(t),
+        chartColors: type === 'doughnut' ? [ACC, INK, GREY, MUTED, RULE].slice(0, labels.length) : colors,
+        barDir: type === 'bar' ? 'bar' : 'col', barGapWidthPct: 60,
+        catAxisLabelColor: axis.color, catAxisLabelFontFace: axis.fontFace, catAxisLabelFontSize: axis.fontSize,
+        valAxisLabelColor: axis.color, valAxisLabelFontFace: axis.fontFace, valAxisLabelFontSize: axis.fontSize,
+        catAxisLineShow: true, catAxisLineColor: RULE, valAxisLineShow: false, valAxisLabelFormatCode: numFmt,
+        valGridLine: { color: RULE, size: 0.5 }, catGridLine: { style: 'none' },
+        // label data langsung; sumbu nilai disembunyikan pada batang/kolom agar tidak dobel
+        showValue: type === 'doughnut' ? false : showValue, dataLabelFormatCode: numFmt,
+        dataLabelColor: TEXT, dataLabelFontFace: FONT, dataLabelFontSize: TYPE.chart, dataLabelPosition: type === 'line' ? 't' : 'outEnd',
+        valAxisHidden: PT === 'bar' && showValue, ...(PT === 'bar' && showValue ? { valGridLine: { style: 'none' } } : {}),
+        showLegend: series.length > 1 || type === 'doughnut', legendPos: 'b', legendFontFace: FONT, legendFontSize: TYPE.chart, legendColor: MUTED,
+        lineSize: 2, lineDataSymbol: 'circle', lineDataSymbolSize: 6,
+        ...(type === 'doughnut' ? { holeSize: 60, showPercent: true, showLabel: false, dataLabelColor: WHITE } : {}),
+      };
+      s.addChart(PT, data, opts);
+      if (panel) {
+        const px = colX(8) + 0.1, pw = col(4) - 0.1;
+        if (keyValue !== undefined) s.addText(String(keyValue), base({ x: px, y: Z.bodyY + 0.1, w: pw, h: 0.6, fontSize: TYPE.keyValue, bold: true, color: ACC, valign: 'top', objectName: 'angka-kunci' }));
+        if (keyText) {
+          checkFit('chart.keyText', [keyText], pw, TYPE.body, bottom - Z.bodyY - 0.85);
+          s.addText(rich(keyText), base({ x: px, y: Z.bodyY + 0.85, w: pw, h: bottom - Z.bodyY - 0.85, fontSize: TYPE.body, color: TEXT, valign: 'top', lineSpacingMultiple: 1.15, objectName: 'penjelasan' }));
+        }
+      }
+      source(s, src);
+      return finish(s);
+    },
+
+    // 8. Gambar + keterangan — "Seperti apa wujudnya?" Rasio gambar dijaga; keterangan "Gambar N · …" di bawah.
+    // wide: true → gambar 8 kolom + teks 4 kolom (tangkapan layar lebar); bawaan 7 + 5.
+    image({ chapter, title: t, image, alt, caption, bullets = [], wide = false, source: src, notes } = {}) {
+      if (!alt) warn('image: alt (teks alternatif) wajib diisi untuk aksesibilitas.');
+      const buf = fs.readFileSync(image);
+      const info = imageInfo(buf, image);
+      const s = add('NEURON_ISI', notes);
+      head(s, 'image', chapter, t);
+      const bottom = bottomOf(src);
+      const boxW = col(wide ? 8 : 7), boxH = bottom - Z.bodyY - (caption ? 0.35 : 0);
+      const scale = Math.min(boxW / info.w, boxH / info.h);
+      const iw = info.w * scale, ih = info.h * scale;
+      s.addImage({ data: `image/${info.type === 'jpg' ? 'jpeg' : 'png'};base64,${buf.toString('base64')}`, x: M, y: Z.bodyY, w: iw, h: ih,
+        altText: alt || '', objectName: 'gambar' });
+      if (caption) {
+        const [label, ...rest] = String(caption).split(' · ');
+        s.addText([{ text: label + (rest.length ? ' · ' : ''), options: { bold: true } }, { text: rest.join(' · ') }],
+          base({ x: M, y: Z.bodyY + ih + 0.1, w: Math.max(iw, 3), h: 0.22, fontSize: TYPE.label, color: MUTED, valign: 'top', objectName: 'keterangan-gambar' }));
+      }
+      if (bullets.length) {
+        if (bullets.length > 3) warn(`image: ${bullets.length} poin; maksimal 3 di samping gambar.`);
+        const tx = M + boxW + GAP;
+        bulletBox(s, 'image', bullets, tx, Z.bodyY, M + W - tx, bottom - Z.bodyY, { objectName: 'poin' });
+      }
+      source(s, src);
+      return finish(s);
+    },
+
+    // 9. Angka penting — "Berapa angkanya dan apa artinya?" stats: [{ value, label, note }]; highlight: indeks merah.
+    stats({ chapter, title: t, stats = [], highlight = 0, explanation, source: src, notes } = {}) {
+      if (stats.length > 3) warn(`stats: ${stats.length} angka; maksimal 3 per slide.`);
+      const s = add('NEURON_ISI', notes);
+      head(s, 'stats', chapter, t);
+      const one = stats.length === 1;
+      const cw = one ? col(6) : col(4);
+      stats.forEach((st, i) => {
+        const x = one ? M : colX(i * 4);
+        const big = one ? TYPE.statOne : TYPE.stat;
+        const vh = big / 72 * 1.25;
+        s.addText(nb(st.value), base({ x, y: Z.bodyY + 0.1, w: cw, h: vh, fontSize: big, bold: true, color: i === highlight ? ACC : INK, valign: 'bottom', objectName: `angka-${i + 1}` }));
+        let y = Z.bodyY + 0.1 + vh + 0.12;
+        if (st.label) { s.addText(rich(st.label), base({ x, y, w: cw, h: 0.3, fontSize: TYPE.body, bold: true, color: INK, valign: 'top', objectName: `label-angka-${i + 1}` })); y += 0.36; }
+        if (st.note) s.addText(rich(st.note), base({ x, y, w: cw, h: 0.6, fontSize: TYPE.small, color: MUTED, valign: 'top', lineSpacingMultiple: 1.15, objectName: `ket-angka-${i + 1}` }));
+      });
+      if (one && explanation) {
+        const x = colX(6);
+        checkFit('stats.explanation', [explanation], col(6), TYPE.body, bottomOf(src) - Z.bodyY - 0.2);
+        s.addText(rich(explanation), base({ x, y: Z.bodyY + 0.2, w: col(6), h: bottomOf(src) - Z.bodyY - 0.2, fontSize: TYPE.body, color: TEXT, valign: 'top', lineSpacingMultiple: 1.2, objectName: 'penjelasan' }));
+      }
+      source(s, src);
+      return finish(s);
+    },
+
+    // 10. Penutup — "Apa yang harus terjadi setelah ini, dan siapa yang dihubungi?"
+    // steps: string | { text, owner }; contact: { name, role, email, phone }.
+    closing({ chapter = 'Penutup', title: t = 'Langkah berikutnya', steps = [], contact, notes } = {}) {
+      if (steps.length > 4) warn(`closing: ${steps.length} langkah; maksimal 4.`);
+      openSection('Penutup');
+      const s = add('NEURON_PENUTUP', notes);
+      head(s, 'closing', chapter, t);
+      const rowH = 0.62;
+      steps.forEach((st, i) => {
+        const { text, owner } = typeof st === 'string' ? { text: st } : st;
+        const y = Z.bodyY + i * rowH;
+        s.addText(String(i + 1), base({ x: M, y, w: 0.4, h: 0.3, fontSize: TYPE.subhead, bold: true, color: INK, valign: 'top', objectName: `langkah-no-${i + 1}` }));
+        s.addText([...rich(text, { fontSize: TYPE.body, color: TEXT }), ...(owner ? [{ text: '', options: { breakLine: true } }, { text: owner, options: { fontSize: TYPE.small, color: MUTED } }] : [])],
+          base({ x: M + 0.45, y, w: col(7) - 0.45, h: rowH - 0.05, valign: 'top', lineSpacingMultiple: 1.1, objectName: `langkah-${i + 1}` }));
+      });
+      if (contact) {
+        const x = colX(8), w = col(4);
+        const runs = [{ text: 'Kontak', options: { fontSize: TYPE.label, bold: true, color: MUTED, breakLine: true } }];
+        if (contact.name) runs.push({ text: contact.name, options: { fontSize: TYPE.body, bold: true, color: INK, breakLine: true } });
+        if (contact.role) runs.push({ text: contact.role, options: { fontSize: TYPE.small, color: MUTED, breakLine: true } });
+        [contact.email, contact.phone].filter(Boolean).forEach((v) => runs.push({ text: v, options: { fontSize: TYPE.small, color: TEXT, breakLine: true } }));
+        runs[runs.length - 1].options.breakLine = false;
+        s.addText(runs, base({ x, y: Z.bodyY, w, h: 1.6, valign: 'top', paraSpaceAfter: 4, objectName: 'kontak' }));
+      }
+      return finish(s);
+    },
+
     async save(out) {
       await pres.writeFile({ fileName: out });
       await fixParagraphs(out);
@@ -212,4 +441,5 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
   return api;
 }
 
-module.exports = { createDeck, THEME, TYPE, ACC, ACC_DARK, INK, MUTED, TEXT, RULE, HEAD_FILL, ZEBRA, FONT, LOGO_PATH, LOGO_RATIO };
+module.exports = { createDeck, THEME, TYPE, SERIES, ACC, ACC_DARK, INK, MUTED, TEXT, RULE, HEAD_FILL, ZEBRA, GREY, FONT,
+  LOGO_PATH, LOGO_RATIO, imageInfo };
