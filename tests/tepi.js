@@ -34,6 +34,14 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
     nodes: [{ id: 'w', title: 'Aplikasi pemindai', tag: 'Kontainer · React', desc: 'Pindai & cari barang', col: 1, row: 0 },
       { id: 'a', title: 'API inventori', tag: 'Kontainer · Go', desc: 'Aturan stok dan opname', kind: 'main', col: 1, row: 1 },
       { id: 'd', title: 'Basis data', tag: 'Kontainer · MySQL', kind: 'db', col: 1, row: 2 }] }), /isi simpul .* tidak muat/, 'C4 3 baris berisi panjang');
+  // C4 3 baris dengan tag di SEMUA simpul (termasuk silinder basis data), dengan dan tanpa sumber: harus diterima
+  for (const source of [undefined, 'Sumber: uji']) {
+    const dd = T.createDeck({});
+    dd.architecture({ title: 'C4 tag', caption: 'Diagram kontainer · Uji', boundary: { label: 'b', cols: [1, 2] }, source,
+      nodes: [{ id: 'u', title: 'Staf gudang', tag: 'Orang', kind: 'person', col: 0, row: 0 }, { id: 'w', title: 'Aplikasi', tag: 'React', col: 1, row: 0 },
+        { id: 'a', title: 'API', tag: 'Go', kind: 'main', col: 1, row: 1 }, { id: 'd', title: 'Basis data', tag: 'MySQL', kind: 'db', col: 1, row: 2 }],
+      links: [{ from: 'u', to: 'w', label: 'Pakai' }, { from: 'w', to: 'a', label: 'JSON' }, { from: 'a', to: 'd', label: 'SQL' }] });
+  }
   ok('input wajib kosong/salah memberi galat yang jelas');
   // format angka label di luar grafik
   assert.strictEqual(T.formatNum(0.048, '0.0%'), '4,8%');

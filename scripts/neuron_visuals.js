@@ -23,10 +23,14 @@ function build(ctx) {
   function path(s, pts, o = {}) {
     for (let i = 1; i < pts.length; i++) seg(s, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], { ...o, arrow: !!o.arrow && i === pts.length - 1, name: `${o.name || 'diagram-garis'}-${i}` });
   }
-  // Tinggi isi simpul (judul 12 pt tebal + tag 9 pt + deskripsi 9 pt) termasuk bantalan atas/bawah.
-  const nodeNeed = ({ w, title, tag, desc, kind }) => (kind === 'db' ? 0.14 : 0.06) + 0.04
-    + (lines(title, w - 0.16, V.node, true) * V.node * 1.2 + (tag ? lines(`[${tag}]`, w - 0.16, V.tag) * V.tag * 1.2 : 0)
-      + (desc ? lines(desc, w - 0.16, V.tag) * V.tag * 1.2 : 0)) / 72;
+  // Tinggi isi simpul (judul 12 pt tebal + tag 9 pt + deskripsi 9 pt) + bantalan atas (silinder: tutup elips 0,14").
+  // Tinggi baris dikalibrasi ke render nyata: ± 1,15 × ukuran huruf pada lineSpacingMultiple 1,0.
+  const LH = 1.15;
+  // bantalan atas: silinder (preset can) punya tutup elips setinggi 25% sisi terpendek → teks mulai di tengah tutup
+  const padTop = (kind, w, h) => (kind === 'db' ? Math.min(0.14, 0.125 * Math.min(w, h) + 0.04) : 0.06);
+  const nodeNeed = ({ w, h, title, tag, desc, kind }) => padTop(kind, w, h)
+    + (lines(title, w - 0.16, V.node, true) * V.node * LH + (tag ? lines(`[${tag}]`, w - 0.16, V.tag) * V.tag * LH : 0)
+      + (desc ? lines(desc, w - 0.16, V.tag) * V.tag * LH : 0)) / 72;
   // Simpul: kotak dengan judul + (tag) + deskripsi. kind: 'node' | 'main' | 'external' | 'person' | 'db'
   function node(s, { x, y, w, h, title, tag, desc, kind = 'node', focus = false, name = 'diagram-simpul', alt }) {
     if (nodeNeed({ w, title, tag, desc, kind }) > h + 0.02) warn(`diagram: isi simpul "${plain(title)}" diperkirakan tidak muat (${h.toFixed(2)}") — persingkat judul/deskripsi.`);
@@ -39,7 +43,7 @@ function build(ctx) {
     const runs = [{ text: plain(title), options: { fontSize: V.node, bold: true, color: tc, breakLine: !!(tag || desc) } }];
     if (tag) runs.push({ text: `[${tag}]`, options: { fontSize: V.tag, color: sc, breakLine: !!desc } });
     if (desc) runs.push({ text: plain(desc), options: { fontSize: V.tag, color: sc } });
-    const top = kind === 'db' ? 0.14 : 0.06;
+    const top = padTop(kind, w, h);
     s.addText(runs, base({ x: x + 0.08, y: y + top, w: w - 0.16, h: h - top - 0.04, align: 'center', valign: 'middle', lineSpacingMultiple: 1.0, objectName: `${name}-teks` }));
   }
   const fmtID = (v, opts) => new Intl.NumberFormat('id-ID', opts).format(v);
@@ -404,7 +408,7 @@ function build(ctx) {
       Object.values(pos).forEach((p) => {
         const kind = p.kind === 'container' || p.kind === 'person' ? 'node' : p.kind || 'node';
         const needH = nodeNeed({ ...p, kind });
-        if (needH > p.h + 0.02) throw new Error(`[neuron_theme] architecture: isi simpul "${p.id}" tidak muat (perlu ± ${needH.toFixed(2)}", ada ${p.h.toFixed(2)}") — persingkat judul/desc, hilangkan source/columns, atau pakai 2 baris.`);
+        if (needH > p.h + 0.02) throw new Error(`[neuron_theme] architecture: isi simpul "${p.id}" tidak muat (perlu ± ${needH.toFixed(2)}", ada ${p.h.toFixed(2)}") — persingkat judul${p.desc ? '/deskripsi (atau hapus desc)' : '/tag'}, hilangkan source/columns, atau pakai 2 baris.`);
       });
       links.forEach((l, i) => {
         if (!pos[l.from] || !pos[l.to]) throw new Error(`[neuron_theme] architecture: link ${i + 1} merujuk simpul yang tidak ada (${l.from} → ${l.to}).`);

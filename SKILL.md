@@ -133,8 +133,8 @@ Alasan & sumber: brief desain proyek ini, bagian "Visualisasi".
 
 Diagram arsitektur: label garis konteks/kontainer = kata kerja + objek ("Mencatat barang", ± 14 karakter per celah);
 "sistem kami" yang membentang beberapa sel dibuat ringkas bila garis dari tetangganya tetap lurus. Pada 3 baris simpul
-menjadi lebih pendek (± 0,4–0,5"): bila judul + tag + deskripsi tidak muat, tema berhenti dengan pesan — persingkat
-deskripsi, hilangkan `source`/`columns`, atau pakai 2 baris. Label dua garis tegak yang berdampingan saling menghindar;
+menjadi lebih pendek (± 0,4–0,5"): judul + tag muat; judul + tag + deskripsi biasanya tidak — tema berhenti dengan
+pesan bila isi simpul tidak muat (persingkat/hapus deskripsi, hilangkan `source`/`columns`, atau pakai 2 baris). Label dua garis tegak yang berdampingan saling menghindar;
 bila tetap tidak muat, tema memperingatkan agar label dipersingkat.
 
 Aturan pemakaian visual:
