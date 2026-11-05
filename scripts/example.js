@@ -59,7 +59,7 @@ function mockDashboard(file) {
   // ===== Bab 1 =====
   deck.section({ number: '01', title: 'Latar belakang', description: 'Pertumbuhan pesanan online mengubah beban gudang.' });   // [3] pembatas bab
   deck.chart({                                                        // grafik garis: seri fokus merah + label di ujung garis
-    chapter: BAB1, title: 'Pesanan online melampaui pesanan toko sejak Mei dan terus naik', type: 'line',
+    chapter: BAB1, title: 'Pesanan online melampaui toko sejak Mei dan terus naik', type: 'line',
     labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt'],
     series: [
       { name: 'Online', values: [310, 335, 360, 395, 430, 470, 505, 540, 575, 612] },
@@ -90,15 +90,15 @@ function mockDashboard(file) {
   });
   deck.chart({                                                        // batang horizontal satu seri: satu batang disorot
     chapter: BAB2, title: 'Gudang Medan menyumbang selisih terbesar', type: 'bar',
-    labels: ['Medan', 'Surabaya', 'Cikarang', 'Makassar', 'Bandung'], series: [{ name: 'Selisih (unit)', values: [128, 96, 74, 51, 22] }],
+    labels: ['Medan', 'Surabaya', 'Cikarang'], series: [{ name: 'Selisih (unit)', values: [128, 96, 74] }],
     highlight: 0, source: 'Sumber: audit stok Agustus–Oktober 2026 (unit selisih per 10.000 unit)',
   });
   deck.chart({                                                        // tumpuk 100% horizontal: segmen fokus menempel kiri
-    chapter: BAB2, title: 'Staf paling puas di gudang yang sudah mencoba pemindai', type: 'stacked100',
-    labels: ['Cikarang', 'Surabaya', 'Medan', 'Makassar'],
-    series: [{ name: 'Puas', values: [62, 48, 40, 35] }, { name: 'Netral', values: [21, 30, 35, 30] },
-      { name: 'Tidak puas', values: [12, 15, 20, 30] }, { name: 'Tidak menjawab', values: [5, 7, 5, 5] }],
-    source: 'Sumber: survei staf gudang, September 2026 (n = 214)',
+    chapter: BAB2, title: 'Staf Cikarang, gudang uji coba pemindai, paling puas dengan proses', type: 'stacked100',
+    labels: ['Cikarang', 'Surabaya', 'Medan'],
+    series: [{ name: 'Puas', values: [62, 48, 40] }, { name: 'Netral', values: [21, 30, 35] },
+      { name: 'Tidak puas', values: [12, 15, 20] }, { name: 'Tidak menjawab', values: [5, 7, 5] }],
+    source: 'Sumber: survei staf gudang, September 2026 (n = 214); sisa 5–7% tidak menjawab',
   });
   deck.twoColumn({                                                    // [5] dua kolom
     chapter: BAB2, title: 'Pemindaian di penerimaan memangkas langkah pencatatan dari lima menjadi dua',
@@ -107,9 +107,9 @@ function mockDashboard(file) {
     recommend: 'right',
   });
   deck.compare({                                                      // sebelum/sesudah
-    chapter: BAB2, title: 'Uji coba di Cikarang memangkas waktu pencatatan 60%',
+    chapter: BAB2, title: 'Uji coba di Cikarang memangkas waktu pencatatan dari 2 hari menjadi 4 jam',
     rows: [
-      { name: 'Waktu pencatatan barang masuk', before: '5 hari', after: '2 hari', delta: '−60%' },
+      { name: 'Waktu pencatatan barang masuk', before: '2 hari', after: '4 jam', delta: '−92%' },
       { name: 'Kesalahan input', before: '8%', after: '1,5%', delta: '−6,5 poin' },
       { name: 'Laporan stok', before: 'Manual', after: 'Otomatis' },
     ],
@@ -118,7 +118,7 @@ function mockDashboard(file) {
 
   // ===== Bab 3 =====
   deck.section({ number: '03', title: 'Rencana tiga tahap', description: 'Lingkup, alur kerja baru, jadwal, dan arsitektur.' });
-  deck.process({                                                      // alur langkah
+  deck.process({                                                      // keyPoint: panel Inti satu baris di bawah diagram                                                      // alur langkah
     chapter: BAB3, title: 'Barang masuk tercatat dalam lima langkah, langkah ketiga kini otomatis',
     steps: [
       { title: 'Terima barang', text: 'Petugas mencocokkan surat jalan dengan pesanan pembelian' },
@@ -128,40 +128,41 @@ function mockDashboard(file) {
       { title: 'Laporan harian', text: 'Selisih muncul di dasbor pukul 07.00' },
     ],
     active: 2,
+    keyPoint: 'Langkah 3 otomatis: stok di ERP sama dengan isi rak sejak barang tiba.',
   });
   deck.cycle({                                                        // siklus
-    chapter: BAB3, title: 'Opname bergilir berjalan dalam siklus bulanan, bukan sekali setahun',
+    chapter: BAB3, title: 'Opname bergilir berjalan setiap minggu, bukan sebulan sekali',
     steps: [{ title: 'Rencanakan', text: 'Pilih rak minggu ini' }, { title: 'Hitung', text: 'Pindai rak terpilih' },
       { title: 'Periksa', text: 'Bandingkan dengan ERP' }, { title: 'Perbaiki', text: 'Koreksi & cari penyebab' }],
-    active: 2, center: 'Setiap minggu',
+    active: 2, center: 'Siklus mingguan',
   });
   deck.table({                                                        // [6] tabel
     chapter: BAB3, title: 'Tiga tahap selesai dalam 20 minggu dengan risiko terkendali',
     caption: 'Tabel 1 · Tahapan, risiko utama, durasi, dan biaya',
-    head: ['Tahap', 'Lingkup', 'Risiko utama → mitigasi', 'Durasi', 'Biaya (Rp jt)'],
+    head: ['Tahap', 'Lingkup', 'Risiko utama: mitigasi', 'Durasi', 'Biaya (Rp jt)'],
     rows: [
-      ['1. Fondasi', 'Kode tunggal, pemindai', 'Kode ganda → bersihkan data', '6 minggu', '420'],
-      ['2. Integrasi', 'Sinkron ERP dan kurir', 'API kurir berubah → adaptor', '8 minggu', '610'],
-      ['3. Otomasi', 'Opname bergilir, dasbor', 'Staf belum terbiasa → pelatihan', '6 minggu', '380'],
+      ['1. Fondasi', 'Kode tunggal, pemindai', 'Kode ganda: bersihkan data', '6 minggu', '420'],
+      ['2. Integrasi', 'Sinkron ERP dan kurir', 'API kurir berubah: adaptor', '8 minggu', '610'],
+      ['3. Otomasi', 'Opname bergilir, dasbor', 'Staf belum terbiasa: pelatihan', '6 minggu', '380'],
       ['**Total**', '', '', '**20 minggu**', '**1.410**'],
     ],
     widths: [1.3, 2.2, 3.0, 1.2, 1.3], align: ['l', 'l', 'l', 'r', 'r'],
     source: 'Sumber: estimasi Tim Engineering Neuronworks, harga belum termasuk PPN',
   });
   deck.timeline({                                                     // linimasa tonggak
-    chapter: BAB3, title: 'Uji coba sudah berjalan, rilis ke tiga gudang September 2027',
+    chapter: BAB3, title: 'Rilis ke tiga gudang Mei 2027, enam bulan setelah persetujuan',
     milestones: [
-      { date: 'Jan 2027', label: 'Kickoff proyek', status: 'done' }, { date: 'Mar 2027', label: 'Kode barang tunggal', status: 'done' },
-      { date: 'Jun 2027', label: 'Uji coba gudang Cikarang', status: 'now' }, { date: 'Sep 2027', label: 'Rilis ke tiga gudang' },
-      { date: 'Des 2027', label: 'Evaluasi dan rencana 2028' },
+      { date: 'Agu 2026', label: 'Uji coba pemindai di Cikarang', status: 'done' }, { date: 'Nov 2026', label: 'Proposal dan persetujuan', status: 'now' },
+      { date: 'Feb 2027', label: 'Tahap 1: kode tunggal dan pemindai' }, { date: 'Apr 2027', label: 'Tahap 2: sinkron ERP dan kurir' },
+      { date: 'Mei 2027', label: 'Tahap 3: rilis ke tiga gudang' },
     ],
+    keyPoint: 'Persetujuan bulan ini menjaga rilis Mei, sebelum puncak pesanan Lebaran.',
   });
   deck.timeline({                                                     // linimasa fase (Gantt ringkas)
-    chapter: BAB3, title: 'Tahap integrasi berjalan sesuai jadwal',
-    periods: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt'],
-    phases: [{ name: '1. Fondasi', start: 0, end: 3, status: 'done' }, { name: '2. Integrasi', start: 3, end: 7, status: 'active' },
-      { name: '3. Otomasi', start: 7, end: 10 }],
-    today: 5.5, source: 'Sumber: rencana proyek, revisi Juni 2027',
+    chapter: BAB3, title: 'Tiga tahap selesai dalam 20 minggu, Januari sampai Mei 2027',
+    periods: ['Jan 2027', 'Feb', 'Mar', 'Apr', 'Mei'],
+    phases: [{ name: '1. Fondasi', start: 0, end: 1.5 }, { name: '2. Integrasi', start: 1.5, end: 3.5 }, { name: '3. Otomasi', start: 3.5, end: 5 }],
+    source: 'Sumber: rencana proyek Tim Engineering, November 2026',
   });
   deck.matrix({                                                       // matriks 2×2
     chapter: BAB3, title: 'Pemindai di penerimaan memberi dampak terbesar dengan usaha terkecil',
@@ -176,13 +177,14 @@ function mockDashboard(file) {
     source: 'Sumber: penilaian Tim Engineering dan tim gudang, Oktober 2026 (posisi berdasarkan penilaian tim)',
   });
   deck.orgChart({                                                     // struktur organisasi
-    chapter: BAB3, title: 'Tim proyek melapor ke satu sponsor di direksi',
+    chapter: BAB3, title: 'Neuronworks memimpin unit teknologi di bawah satu sponsor direksi',
     root: { title: 'Direktur Operasi', role: 'Sponsor proyek' },
     units: [
       { title: 'Gudang', role: 'Kepala gudang', items: ['Penerimaan', 'Opname'] }, { title: 'Keuangan', role: 'Controller', items: ['Nilai persediaan'] },
       { title: 'Teknologi', role: 'Neuronworks', items: ['Aplikasi', 'Integrasi'] }, { title: 'Pengadaan', role: 'Manajer', items: ['Pemasok'] },
     ],
     focus: 2,
+    keyPoint: 'Satu sponsor direksi memutus keputusan lintas unit dalam seminggu.',
   });
   deck.architecture({                                                 // diagram konteks C4 (untuk klien/manajemen)
     chapter: BAB3, title: 'Sistem inventori melayani dua peran dan terhubung ke dua sistem luar', caption: 'Diagram konteks · Sistem Inventori',
@@ -192,8 +194,8 @@ function mockDashboard(file) {
       { id: 'erp', title: 'ERP perusahaan', tag: 'Sistem luar', kind: 'external', col: 3, row: 0 }, { id: 'mail', title: 'Layanan email', tag: 'Sistem luar', kind: 'external', col: 3, row: 1 },
     ],
     links: [
-      { from: 'staf', to: 'sys', label: 'Mencatat', protocol: 'HTTPS' }, { from: 'mgr', to: 'sys', label: 'Laporan', protocol: 'HTTPS' },
-      { from: 'sys', to: 'erp', label: 'Sinkron stok', protocol: 'REST' }, { from: 'sys', to: 'mail', label: 'Notifikasi', protocol: 'SMTP' },
+      { from: 'staf', to: 'sys', label: 'Mencatat barang', protocol: 'HTTPS' }, { from: 'mgr', to: 'sys', label: 'Melihat laporan', protocol: 'HTTPS' },
+      { from: 'sys', to: 'erp', label: 'Menyinkronkan stok', protocol: 'REST' }, { from: 'sys', to: 'mail', label: 'Mengirim notifikasi', protocol: 'SMTP' },
     ],
   });
   deck.architecture({                                                 // diagram kontainer C4 (untuk tim teknis)
@@ -208,9 +210,9 @@ function mockDashboard(file) {
       { id: 'kurir', title: 'API kurir', tag: 'Sistem luar', kind: 'external', col: 3, row: 1 },
     ],
     links: [
-      { from: 'staf', to: 'web', label: 'Memindai', protocol: 'HTTPS' }, { from: 'web', to: 'api', label: 'Barang masuk', protocol: 'JSON/HTTPS', focus: true },
-      { from: 'api', to: 'db', label: 'Simpan stok', protocol: 'SQL' }, { from: 'api', to: 'erp', label: 'Sinkron stok', protocol: 'REST' },
-      { from: 'api', to: 'kurir', label: 'Pesan kirim', protocol: 'REST', dashed: true },
+      { from: 'staf', to: 'web', label: 'Memindai', protocol: 'HTTPS' }, { from: 'web', to: 'api', label: 'Mencatat stok', protocol: 'JSON/HTTPS', focus: true },
+      { from: 'api', to: 'db', label: 'Menyimpan stok', protocol: 'SQL' }, { from: 'api', to: 'erp', label: 'Sinkron stok', protocol: 'REST' },
+      { from: 'api', to: 'kurir', label: 'Pesan kurir', protocol: 'REST', dashed: true },
     ],
   });
   deck.architecture({                                                 // alur data (kiri → kanan)
@@ -233,7 +235,7 @@ function mockDashboard(file) {
   });
 
   // ===== Bab 4 =====
-  deck.section({ number: '04', title: 'Biaya dan dampak' });
+  deck.section({ number: '04', title: 'Biaya dan dampak', description: 'Hasil yang diharapkan dan waktu balik modal.' });
   deck.chart({                                                        // [7] kolom satu seri, satu batang disorot + panel angka
     chapter: BAB4, title: 'Selisih stok turun bertahap hingga di bawah 1% pada akhir tahap 3', type: 'column',
     labels: ['Sekarang', 'Tahap 1', 'Tahap 2', 'Tahap 3'], series: [{ name: 'Selisih stok (%)', values: [4.8, 2.6, 1.5, 0.8] }],
@@ -248,17 +250,17 @@ function mockDashboard(file) {
     highlight: 5, source: 'Sumber: data pengiriman gudang Cikarang, Mei–Oktober 2026 (rata-rata per hari)',
   });
   deck.chart({                                                        // kolom berkelompok (maks. 3 seri)
-    chapter: BAB4, title: 'Gudang Cikarang paling cepat memproses barang masuk di ketiga triwulan', type: 'column',
-    labels: ['Q1', 'Q2', 'Q3'],
+    chapter: BAB4, title: 'Cikarang paling cepat memproses barang masuk di tiga triwulan', type: 'column',
+    labels: ['TW I', 'TW II', 'TW III'],
     series: [{ name: 'Cikarang', values: [42, 47, 55] }, { name: 'Surabaya', values: [38, 40, 41] }, { name: 'Medan', values: [30, 33, 35] }],
     focus: 0, source: 'Sumber: data operasional 2026 (palet per jam)',
   });
   deck.stats({                                                        // [9] angka penting (ikon opsional)
     chapter: BAB4, title: 'Investasi kembali dalam 14 bulan dari penghematan selisih dan lembur',
     stats: [
-      { value: '14 bln', label: 'Titik balik modal', note: 'Dihitung dari penghematan bulanan Rp 101 jt', icon: 'target' },
+      { value: '14 bulan', label: 'Titik balik modal', note: 'Dihitung dari penghematan bulanan Rp 101 jt', icon: 'target' },
       { value: 'Rp 1,2 M', label: 'Penghematan per tahun', note: 'Selisih stok, lembur opname, dan klaim kurir', icon: 'wallet' },
-      { value: '3 hari', label: 'Waktu opname dihapus', note: 'Diganti opname bergilir harian', icon: 'clock' },
+      { value: '3 hari', label: 'Waktu opname dihapus', note: 'Diganti opname bergilir mingguan', icon: 'clock' },
     ],
     highlight: 0, source: 'Sumber: perhitungan Tim Engineering, asumsi volume 2026',
   });
@@ -270,7 +272,7 @@ function mockDashboard(file) {
       { value: '18.500', label: 'Kode barang', note: 'Disatukan dari 3 katalog', icon: 'package' },
       { value: '42', label: 'Pemindai genggam', note: '14 unit per gudang', icon: 'scan-barcode' },
     ],
-    highlight: 2, source: 'Sumber: data master PT Contoh Logistik, Oktober 2026',
+    highlight: 0, source: 'Sumber: data master PT Contoh Logistik, Oktober 2026',
   });
   deck.pyramid({                                                      // piramida konsep (tanpa angka)
     chapter: BAB4, title: 'Program inventori diturunkan langsung dari visi perusahaan',
@@ -279,7 +281,7 @@ function mockDashboard(file) {
     focus: 2,
   });
   deck.funnel({                                                       // corong data (batang sebanding nilai)
-    chapter: BAB4, title: 'Penurunan terbesar pesanan terjadi saat konfirmasi stok',
+    chapter: BAB4, title: 'Penurunan pesanan terbesar terjadi saat konfirmasi stok',
     stages: [{ name: 'Pesanan masuk', value: 12400 }, { name: 'Stok terkonfirmasi', value: 9050 }, { name: 'Dikemas', value: 8830 }, { name: 'Dikirim', value: 8710 }],
     focus: 1, source: 'Sumber: data pesanan Oktober 2026',
   });
@@ -290,7 +292,7 @@ function mockDashboard(file) {
     steps: [
       { text: 'Setujui lingkup dan anggaran tahap 1', owner: 'Direksi PT Contoh Logistik  ·  20 November 2026' },
       { text: 'Tetapkan satu kode barang untuk ketiga gudang', owner: 'Tim gudang + Neuronworks  ·  4 Desember 2026' },
-      { text: 'Mulai uji coba pemindai di gudang Cikarang', owner: 'Neuronworks  ·  Januari 2027' },
+      { text: 'Mulai tahap 1 di ketiga gudang', owner: 'Neuronworks  ·  Januari 2027' },
     ],
     contact: { name: 'Nama Penanggung Jawab', role: 'Project Manager · Neuronworks', email: 'nama@neuronworks.co.id', phone: '+62 21 0000 0000' },
   });

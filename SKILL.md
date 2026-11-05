@@ -104,16 +104,21 @@ Semua visual memakai **grafik dan bentuk asli PowerPoint** (bisa diedit, bukan g
 SATU hal yang merah per slide — yang disebut judul aksi; sisanya abu `8C939D`, gelap `1F2937`, atau sedang `5B6470`.
 Urutan warna seri: `B3121B` (fokus) → `8C939D` → `1F2937` → `5B6470` (maks. 4 warna; lebih → gabung "Lainnya" atau pecah).
 Tanpa legenda bila label bisa ditulis langsung, tanpa tanda tick, garis bantu tipis, angka gaya Indonesia (4,8 · 1.410).
+
+> **Pemisah desimal di PowerPoint:** angka di dalam grafik asli diberi format berpenanda bahasa Indonesia (`[$-421]`).
+> LibreOffice/PDF menampilkannya "4,8"; PowerPoint dapat mengikuti setelan bahasa komputer penampil (bisa tampil "4.8" di
+> komputer berbahasa Inggris) — belum diverifikasi di Microsoft PowerPoint. Angka di luar grafik (label ujung, panel, corong,
+> donat) selalu gaya Indonesia. Bila wajib pasti, kirim deck sebagai PDF dari `render.sh`.
 Alasan & sumber: brief desain proyek ini, bagian "Visualisasi".
 
 | Kelompok | Fungsi | Kapan & batas | Opsi utama |
 |---|---|---|---|
-| Grafik | `chart({ type: 'column' })` | perbandingan besaran; ≤ 12 kolom; berkelompok ≤ 3 seri | satu seri: `highlight` = kategori merah; multi-seri: `focus` = seri merah, legenda atas otomatis; seri `{ target: true }` = garis target putus-putus berlabel |
+| Grafik | `chart({ type: 'column' })` | perbandingan besaran; ≤ 12 kolom; berkelompok ≤ 3 seri | satu seri: `highlight` = kategori merah (`-1` = sengaja tanpa sorotan; tanpa keduanya tema memperingatkan); multi-seri: `focus` = seri merah, legenda atas otomatis; seri `{ target: true }` = garis target putus-putus berlabel di belakang batang |
 | | `chart({ type: 'bar' })` | label kategori panjang / > 6 kategori; ≤ 8 batang | urutkan data besar → kecil (digambar terbesar di atas); `highlight` |
 | | `chart({ type: 'line' })` | tren waktu ≥ 5 titik; ≤ 4 garis | `focus` (2,25 pt merah), seri `{ dashed: true }` = rencana/target; nama + nilai terakhir ditulis di ujung garis |
-| | `chart({ type: 'doughnut' })` | bagian-dari-keseluruhan 2–3 bagian (= 100%) | `focus` = irisan merah (bawaan 0); persen fokus di tengah, daftar label di kanan; `keyText` |
+| | `chart({ type: 'doughnut' })` | bagian-dari-keseluruhan 2–3 bagian (= 100%) | `focus` = indeks irisan merah (bawaan 0; `-1` tanpa merah); persen fokus di tengah, daftar label di kanan; `keyText` |
 | | `chart({ type: 'stacked100' })` | komposisi beberapa kelompok; ≤ 5 batang × 4 segmen | seri pertama = segmen fokus (menempel kiri); label % di dalam segmen ≥ 8% |
-| Diagram proses | `process({ steps: [{ title, text }], active, variant })` | urutan kerja 3–6 langkah | `active` = langkah merah; `variant: 'ribbon'` = pita fase (nama ≤ 2 kata) |
+| Diagram proses | `process({ steps: [{ title, text }], active, variant, keyPoint })` | urutan kerja 3–6 langkah | `active` = langkah merah; `variant: 'ribbon'` = pita fase (nama ≤ 2 kata); `keyPoint` = panel Inti satu baris di bawah (juga di `timeline` dan `orgChart`) |
 | | `cycle({ steps, active, center })` | proses berulang 3–5 tahap | `active` = tahap berisian gelap; `center` = label tengah |
 | | `timeline({ milestones: [{ date, label, status }] })` | ≤ 6 tonggak | `status`: `done` (abu gelap), `now` (merah + "Sekarang"), `plan` (lingkaran kosong) |
 | | `timeline({ periods, phases: [{ name, start, end, status }], today })` | jadwal fase ≤ 6 baris | `start`/`end` = indeks periode (end eksklusif); `status`: `done` / `active` (merah) / `plan`; `today` = garis "Hari ini" |
@@ -125,6 +130,10 @@ Alasan & sumber: brief desain proyek ini, bagian "Visualisasi".
 | | `funnel({ stages: [{ name, value }], focus, numFmt })` | corong DATA ≤ 6 tahap | batang sebanding nilai + konversi antar-tahap; `focus` bawaan = penurunan terbesar |
 | Diagram teknis | `architecture({ caption, nodes, links, boundary })` | konteks C4 (klien) / kontainer C4 (tim teknis); ≤ 9 elemen | `nodes[{ id, title, tag, desc, kind, col 0–3, row 0–2, colSpan, rowSpan }]`, `kind`: `person`/`container` (abu muda), `main` (sistem kami, gelap), `external` (putih bergaris), `db` (silinder); `links[{ from, to, label, protocol, focus, dashed }]`; `boundary: { label, cols: [a, b] }` |
 | | `architecture({ columns: ['Sumber', 'Proses', 'Simpan', 'Keluaran'], … })` | alur data kiri → kanan, ≤ 3 simpul per kolom | label garis = nama data yang mengalir; satu jalur `focus` |
+
+Diagram arsitektur: label garis konteks/kontainer = kata kerja + objek ("Mencatat barang", ± 14 karakter per celah);
+"sistem kami" yang membentang beberapa sel dibuat ringkas di tengah bentangnya; 3 baris + keterangan + batas sistem +
+kunci + sumber sekaligus tidak muat — tema berhenti dengan pesan (hapus salah satunya).
 
 Aturan pemakaian visual:
 - Satu visual dominan per slide; judul aksi menyebut apa yang disorot ("Medan menyumbang selisih terbesar" → `highlight` Medan).
