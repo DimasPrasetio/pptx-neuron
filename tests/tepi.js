@@ -66,12 +66,14 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
 
   const charts = Object.keys(zip.files).filter((k) => /^ppt\/charts\/chart\d+\.xml$/.test(k)).sort();
   const donut = await read(charts[0]);
-  assert(/<c:doughnutChart>/.test(donut) && /formatCode="\[\$-421\]0%"/.test(donut), 'doughnut memakai 0% (id-ID)');
+  assert(/<c:doughnutChart>/.test(donut) && !/<c:showPercent val="1"\/>/.test(donut), 'donat tanpa label di irisan');
+  const slides = await Promise.all(Object.keys(zip.files).filter((k) => /^ppt\/slides\/slide\d+\.xml$/.test(k)).map(read));
+  assert(slides.some((x) => /name="grafik-donat-tengah"[\s\S]*?<a:t>50%<\/a:t>/.test(x)), 'persen fokus donat (50%) di tengah');
   for (const c of charts) {
     const x = await read(c);
     for (const m of x.matchAll(/formatCode="([^"]*)"/g)) assert(m[1] === 'General' || m[1].startsWith('[$-421]'), `${c}: ${m[1]}`);
   }
-  ok('label persen doughnut 0%; format angka grafik bertanda id-ID');
+  ok('donat: persen fokus di tengah, tanpa label irisan; format angka grafik bertanda id-ID');
 
   for (const k of Object.keys(zip.files).filter((k) => /^ppt\/(slides|slideLayouts|slideMasters)\/[^/]+\.xml$/.test(k))) {
     const ids = [...(await read(k)).matchAll(/<p:cNvPr\b[^>]*?\bid="(\d+)"/g)].map((m) => m[1]);

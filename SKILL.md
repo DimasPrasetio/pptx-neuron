@@ -80,9 +80,9 @@ Referensi jenis slide:
 | `bullets` | Isi poin | `bullets` (maks. 5, idealnya 1 baris), `keyPoint` (panel "Inti" kanan, opsional) |
 | `twoColumn` | Dua kolom | `left`/`right` = `{ heading, bullets }`; `recommend: 'left' | 'right'` memberi panel + label "Rekomendasi" |
 | `table` | Tabel | `head`, `rows`, `widths` (inci, jumlah 9,0), `align` (`'l' | 'c' | 'r'`), `caption`; maks. 7 baris data (8 tanpa caption) |
-| `chart` | Grafik | `type`: `column`, `bar`, `line`, `doughnut`; `series` maks. 4; `focus` = seri merah (bawaan: seri 0 bila > 1 seri, `-1` = tanpa sorotan); satu seri batang/kolom: `highlight` = indeks kategori merah (yang disebut di judul), lainnya abu; `keyValue` + `keyText` = panel angka kanan (angka gelap bila grafik sudah memuat merah); `numFmt` format angka (ditampilkan gaya Indonesia: 4,8 / 1.410) |
+| `chart` | Grafik | `type`: `column`, `bar` (horizontal, terbesar di atas), `line`, `doughnut`, `stacked100` — rincian di bagian Visualisasi |
 | `image` | Gambar + keterangan | `image` (PNG/JPEG), `alt` (wajib), `caption`, `bullets` (maks. 3), `wide: true` untuk tangkapan layar lebar |
-| `stats` | Angka penting | `stats` maks. 3 `{ value, label, note }`; `highlight` = angka merah (yang disebut di judul); satu angka + `explanation` = varian besar |
+| `stats` | Angka penting / angka besar + ikon | `stats` maks. 4 `{ value, label, note, icon? }` (1 angka 54 pt, 2–3 angka 40 pt, 4 angka 32 pt); `highlight` = satu angka merah (yang disebut di judul); satu angka + `explanation` = varian besar |
 | `closing` | Penutup | `steps` maks. 4 (string atau `{ text, owner }`), `contact`; membuka *section* "Penutup" |
 
 Semua fungsi slide isi menerima `chapter` (label bab, mis. `'02 · Temuan'`), `title` (judul aksi), `source`, dan `notes` (catatan pembicara).
@@ -97,6 +97,47 @@ Aturan pemakaian:
 - Input wajib yang kosong (judul, `series`, `head`, nilai angka) atau tidak cocok (jumlah sel ≠ kolom header, `focus`/`highlight` di luar rentang) menghentikan skrip dengan pesan `[neuron_theme] …` — perbaiki isinya, jangan dibungkam.
 - Grafik selalu native (bisa diedit di PowerPoint). Hanya jenis yang tidak ada di PowerPoint (Sankey, jaringan) yang boleh berupa gambar.
 - Jenis presentasi lain (proposal, pelatihan, laporan) memakai modul yang sama; ubah hanya `cover.type`, `footerLabel`, dan isi.
+
+## Visualisasi (grafik, diagram proses, infografis, diagram teknis)
+
+Semua visual memakai **grafik dan bentuk asli PowerPoint** (bisa diedit, bukan gambar) dan model **"sorot + netral"**: hanya
+SATU hal yang merah per slide — yang disebut judul aksi; sisanya abu `8C939D`, gelap `1F2937`, atau sedang `5B6470`.
+Urutan warna seri: `B3121B` (fokus) → `8C939D` → `1F2937` → `5B6470` (maks. 4 warna; lebih → gabung "Lainnya" atau pecah).
+Tanpa legenda bila label bisa ditulis langsung, tanpa tanda tick, garis bantu tipis, angka gaya Indonesia (4,8 · 1.410).
+Alasan & sumber: brief desain proyek ini, bagian "Visualisasi".
+
+| Kelompok | Fungsi | Kapan & batas | Opsi utama |
+|---|---|---|---|
+| Grafik | `chart({ type: 'column' })` | perbandingan besaran; ≤ 12 kolom; berkelompok ≤ 3 seri | satu seri: `highlight` = kategori merah; multi-seri: `focus` = seri merah, legenda atas otomatis; seri `{ target: true }` = garis target putus-putus berlabel |
+| | `chart({ type: 'bar' })` | label kategori panjang / > 6 kategori; ≤ 8 batang | urutkan data besar → kecil (digambar terbesar di atas); `highlight` |
+| | `chart({ type: 'line' })` | tren waktu ≥ 5 titik; ≤ 4 garis | `focus` (2,25 pt merah), seri `{ dashed: true }` = rencana/target; nama + nilai terakhir ditulis di ujung garis |
+| | `chart({ type: 'doughnut' })` | bagian-dari-keseluruhan 2–3 bagian (= 100%) | `focus` = irisan merah (bawaan 0); persen fokus di tengah, daftar label di kanan; `keyText` |
+| | `chart({ type: 'stacked100' })` | komposisi beberapa kelompok; ≤ 5 batang × 4 segmen | seri pertama = segmen fokus (menempel kiri); label % di dalam segmen ≥ 8% |
+| Diagram proses | `process({ steps: [{ title, text }], active, variant })` | urutan kerja 3–6 langkah | `active` = langkah merah; `variant: 'ribbon'` = pita fase (nama ≤ 2 kata) |
+| | `cycle({ steps, active, center })` | proses berulang 3–5 tahap | `active` = tahap berisian gelap; `center` = label tengah |
+| | `timeline({ milestones: [{ date, label, status }] })` | ≤ 6 tonggak | `status`: `done` (abu gelap), `now` (merah + "Sekarang"), `plan` (lingkaran kosong) |
+| | `timeline({ periods, phases: [{ name, start, end, status }], today })` | jadwal fase ≤ 6 baris | `start`/`end` = indeks periode (end eksklusif); `status`: `done` / `active` (merah) / `plan`; `today` = garis "Hari ini" |
+| | `orgChart({ root: { title, role }, units: [{ title, role, items }], focus })` | ≤ 3 tingkat, ≤ 6 unit | tingkat 3 = `items` (daftar teks, bukan kotak); `focus` = unit berisian gelap |
+| Infografis | `stats({ stats: [{ value, label, note, icon }] })` | 1–4 angka besar | `icon` = nama ikon (lihat Ikon), opsional, ikon tidak pernah merah |
+| | `compare({ labels, rows: [{ name, before, after, delta }], focus })` | sebelum/sesudah ≤ 4 atribut, atribut sama di kedua sisi | `focus` = baris yang deltanya merah |
+| | `matrix({ axes, quadrants, best, points: [{ label, x, y }], focus, explanation })` | prioritas 2×2, ≤ 10 titik (x, y = 0..1) | `best` = kuadran berisian (bawaan `tr`); `explanation` teks atau daftar poin |
+| | `pyramid({ layers, descs, focus })` | KONSEP bertingkat 3–5 lapis, tanpa angka | lapis sama tinggi; jangan untuk data |
+| | `funnel({ stages: [{ name, value }], focus, numFmt })` | corong DATA ≤ 6 tahap | batang sebanding nilai + konversi antar-tahap; `focus` bawaan = penurunan terbesar |
+| Diagram teknis | `architecture({ caption, nodes, links, boundary })` | konteks C4 (klien) / kontainer C4 (tim teknis); ≤ 9 elemen | `nodes[{ id, title, tag, desc, kind, col 0–3, row 0–2, colSpan, rowSpan }]`, `kind`: `person`/`container` (abu muda), `main` (sistem kami, gelap), `external` (putih bergaris), `db` (silinder); `links[{ from, to, label, protocol, focus, dashed }]`; `boundary: { label, cols: [a, b] }` |
+| | `architecture({ columns: ['Sumber', 'Proses', 'Simpan', 'Keluaran'], … })` | alur data kiri → kanan, ≤ 3 simpul per kolom | label garis = nama data yang mengalir; satu jalur `focus` |
+
+Aturan pemakaian visual:
+- Satu visual dominan per slide; judul aksi menyebut apa yang disorot ("Medan menyumbang selisih terbesar" → `highlight` Medan).
+- Garis diagram selalu satu arah, lurus atau siku (dibuat otomatis); label garis singkat (± 12 karakter per baris) — tema
+  memperingatkan bila tidak muat.
+- Jangan pakai donat untuk > 3 bagian, piramida untuk angka, sumbu ganda, atau grafik pelangi (warna berbeda per kategori).
+- Alt text setiap visual dibuat otomatis dari datanya; ringkasan diagram juga baik ditulis di `notes`.
+
+### Ikon
+
+`stats({ … icon: 'users' })` atau langsung `deck.icon(slide, 'users', { x, y, size: 0.4, color })` pada slide hasil fungsi
+tema. Ikon garis Lucide (lisensi ISC) digambar sebagai bentuk asli PowerPoint (bisa diwarnai ulang). Warna `1F2937` (putih di
+latar gelap), tidak pernah merah, maks. satu per kartu, selalu berlabel. Daftar nama: `require('<skill>/scripts/neuron_icons.js').ICON_NAMES`.
 
 ## Verifikasi hasil (wajib)
 

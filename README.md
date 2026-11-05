@@ -14,10 +14,20 @@ Desain Neuron sudah tertanam di skill (token warna, skala huruf, tata letak 10 j
 | 4 | Isi poin | Kesimpulan + 3–5 alasan, panel "Inti" opsional |
 | 5 | Dua kolom | Perbandingan (sekarang vs usulan, opsi A vs B) |
 | 6 | Tabel | Data atau atribut yang dibandingkan |
-| 7 | Grafik | Tren atau perbandingan angka (grafik asli PowerPoint, bisa diedit) |
+| 7 | Grafik | Kolom, batang, garis, donat, tumpuk 100%, kolom + target (grafik asli PowerPoint, bisa diedit) |
 | 8 | Gambar + keterangan | Tangkapan layar, foto, diagram |
-| 9 | Angka penting | 1–3 angka besar beserta artinya |
+| 9 | Angka penting | 1–4 angka besar beserta artinya, dengan ikon opsional |
 | 10 | Penutup | Langkah berikutnya dan kontak |
+
+Ditambah visualisasi (semuanya bentuk asli PowerPoint, bisa diedit):
+
+| Kelompok | Jenis |
+|---|---|
+| Diagram proses | alur langkah, pita fase, siklus, linimasa tonggak, jadwal fase (Gantt ringkas), struktur organisasi |
+| Infografis | angka besar + ikon, sebelum/sesudah, matriks prioritas 2×2, piramida konsep, corong data |
+| Diagram teknis | arsitektur konteks & kontainer (notasi C4), alur data |
+
+Aturannya satu: hanya satu hal merah per slide — yang disebut di judul — sisanya abu dan gelap. Contoh lengkap semua jenis: `node scripts/example.js`.
 
 ## Prasyarat (preinstalled)
 
@@ -77,9 +87,12 @@ pptx-neuron/
 ├── LICENSE.txt
 ├── THIRD_PARTY_NOTICES.txt ← lisensi pustaka open-source yang dibundel
 ├── assets/logo_neuron.png  ← logo resmi (612x176, sama dengan docx-neuron, jangan diregangkan)
+├── assets/icons/lucide.json ← subset ikon Lucide (lisensi ISC)
 ├── scripts/
 │   ├── neuron_theme.js     ← modul desain Neuron (createDeck: cover, agenda, section, bullets, ...)
-│   ├── example.js          ← contoh presentasi lengkap 10 jenis slide (titik awal presentasi baru)
+│   ├── example.js          ← contoh presentasi lengkap: 10 jenis slide + semua visualisasi (titik awal presentasi baru)
+│   ├── neuron_visuals.js   ← diagram proses, infografis, diagram teknis (dipakai neuron_theme.js)
+│   ├── neuron_icons.js     ← ikon garis Lucide sebagai bentuk asli PowerPoint
 │   ├── read_pptx.py        ← baca isi presentasi tanpa modul Python tambahan
 │   ├── render.sh           ← pratinjau: .pptx -> PDF -> JPEG per slide
 │   ├── setup.sh            ← pemasang satu perintah (Node.js; --full untuk pratinjau & alat edit)
@@ -87,7 +100,7 @@ pptx-neuron/
 │   ├── sync.sh             ← salin master ke ~/.claude/skills/pptx-neuron
 │   ├── vendor/pptxgenjs.bundle.cjs ← pustaka pptxgenjs dibundel (lisensi: THIRD_PARTY_NOTICES.txt)
 │   └── office/, add_slide.py, clean.py, slide_text.py, thumbnail.py  ← alat bawaan skill pptx (edit & validasi)
-└── tests/uji.sh            ← uji menyeluruh: buat, validasi, baca, edit, render
+└── tests/                  ← uji.sh (menyeluruh), tepi.js (input tepi & regresi), ikon.js (ikon)
 ```
 
 ## Pemakaian singkat
@@ -97,7 +110,7 @@ Minta Claude: "buat presentasi Neuron tentang ..." atau "buat slide dengan pptx-
 ## Tips agar optimal
 
 - Selalu buat presentasi baru lewat `neuron_theme.js`; jangan menulis gaya dari nol.
-- Coba dulu: `node scripts/example.js` menghasilkan `contoh-neuron.pptx` berisi ke-10 jenis slide.
+- Coba dulu: `node scripts/example.js` menghasilkan `contoh-neuron.pptx` berisi semua jenis slide dan visualisasi.
 - Periksa visual setelah membuat presentasi: `bash scripts/render.sh file.pptx render/`.
 - Tulis judul slide sebagai kesimpulan ("Selisih stok turun 83%"), bukan topik ("Selisih stok").
 - Satu pesan per slide, maksimal 5 poin; penjelasan panjang masuk catatan pembicara.

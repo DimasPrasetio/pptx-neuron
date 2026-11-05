@@ -53,7 +53,7 @@ const TYPE = { coverTitle: 30, sectionNum: 40, sectionTitle: 28, title: 22, stat
   subhead: 15, coverSub: 14, body: 14, key: 14, table: 12, tableDense: 11, small: 11, chart: 10, label: 10,
   meta: 11, source: 9, footer: 9,
   // visualisasi (V3): nama simpul/langkah 12, deskripsi/label 10, tag/label garis 9, nomor lingkaran 11, pita fase 11
-  v: { node: 12, desc: 10, tag: 9, num: 11, ribbon: 11 } };
+  v: { node: 12, desc: 10, tag: 9, num: 11, ribbon: 11, kpi: 24, compare: 24 } };
 const col = (n) => n * 0.475 + (n - 1) * 0.3;          // lebar n kolom dari grid 12 kolom
 const colX = (start) => M + start * (0.475 + 0.3);      // x awal kolom ke-start (0..11)
 
@@ -156,7 +156,12 @@ async function finalize(file) {
         return x.replace(/(<p:cNvPr\b[^>]*?\bid=")\d+(")/g, (m, a, b) => `${a}${++id}${b}`);
       });
     } else if (/^ppt\/charts\/chart\d+\.xml$/.test(name)) {
-      await edit(name, (xml) => xml.replace(/formatCode="(?!General")(?!\[\$-)([^"]*)"/g, 'formatCode="[$-421]$1"'));
+      await edit(name, (xml) => {
+        let x = xml.replace(/formatCode="(?!General")(?!\[\$-)([^"]*)"/g, 'formatCode="[$-421]$1"');
+        // donat: pptxgenjs memaksa nama kategori + persen di tingkat seri (ditimpa per titik) → matikan langsung
+        if (/<c:doughnutChart>/.test(x)) x = x.replace(/<c:showCatName val="1"\/>/g, '<c:showCatName val="0"/>').replace(/<c:showPercent val="1"\/>/g, '<c:showPercent val="0"/>');
+        return x;
+      });
     } else if (/^ppt\/theme\/theme\d+\.xml$/.test(name)) {
       await edit(name, (xml) => {
         const clr = SLOTS.map((k) => `<a:${k}><a:srgbClr val="${THEME.colors[k]}"/></a:${k}>`).join('');
@@ -184,6 +189,15 @@ function formatNum(v, numFmt = '#,##0') {
   const dec = (/0\.(0+)/.exec(numFmt) || [, ''])[1].length;
   const suffix = (/"([^"]*)"\s*$/.exec(numFmt) || [, ''])[1];
   return new Intl.NumberFormat('id-ID', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(v) + suffix;
+}
+
+// Ikon Lucide sebagai bentuk native (scripts/neuron_icons.js). Dimuat saat dipakai; bila modul tidak ada, ikon dilewati.
+let iconsMod;
+function loadIcons() {
+  if (iconsMod === undefined) {
+    try { iconsMod = require('./neuron_icons.js'); } catch (e) { iconsMod = null; warn('ikon: scripts/neuron_icons.js tidak ditemukan — ikon dilewati.'); }
+  }
+  return iconsMod;
 }
 
 // ---------- deck ----------
@@ -261,7 +275,7 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
   };
 
   const visuals = require('./neuron_visuals.js').build({ add, head, finish, source, bottomOf, base, rich, nb, plain, lines, textH, warn, need, bulletBox,
-    T: { ACC, INK, MUTED, TEXT, RULE, ZEBRA, GREY, WHITE }, TYPE, M, W, Z, GAP, col, colX });
+    T: { ACC, INK, MUTED, TEXT, RULE, ZEBRA, GREY, WHITE }, TYPE, M, W, Z, GAP, col, colX, formatNum });
   const api = {
     pres,
     // 1. Sampul — "Apa ini, untuk siapa, dari siapa?"
@@ -389,71 +403,158 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
     },
 
     // 7. Grafik — "Tren/perbandingan apa yang harus dilihat?" Grafik native (bisa diedit di PowerPoint).
-    // type: 'column' | 'bar' | 'line' | 'doughnut'; series: [{ name, values }]; focus: indeks seri merah
-    // (bawaan: seri 0 bila > 1 seri; satu seri tetap gelap agar merah hemat). keyValue/keyText: panel angka kanan.
-    // highlight (satu seri batang/kolom): indeks KATEGORI yang disorot merah (yang disebut di judul); batang lain abu.
+    // type: 'column' | 'bar' | 'line' | 'doughnut' | 'stacked100'. Model "sorot + netral": satu merah per slide.
+    // series: [{ name, values, dashed?, target? }]; focus: indeks seri merah (bawaan seri 0 bila > 1 seri; -1 = tanpa sorotan);
+    // highlight (satu seri batang/kolom): indeks KATEGORI merah (yang disebut di judul), batang lain abu.
+    // column + seri { target: true } = kolom + garis target putus-putus berlabel (satu sumbu, satuan sama).
+    // keyValue/keyText: panel angka kanan (column/bar/line). numFmt: format angka (tampil gaya Indonesia).
     chart({ chapter, title: t, type = 'column', labels = [], series = [], focus, highlight, keyValue, keyText, numFmt = '#,##0',
       showValue = true, source: src, notes } = {}) {
-      if (series.length > 4) warn(`chart: ${series.length} seri; maksimal 4 — gabung ke "Lainnya" atau pecah grafik.`);
+      const TYPES = ['column', 'bar', 'line', 'doughnut', 'stacked100'];
+      if (!TYPES.includes(type)) throw new Error(`[neuron_theme] chart: type '${type}' tidak dikenal (${TYPES.join(', ')}).`);
+      if (!Array.isArray(series) || !series.length) throw new Error('[neuron_theme] chart: series wajib berisi minimal 1 seri.');
+      series.forEach((sr, i) => { if (!sr || !Array.isArray(sr.values) || sr.values.length !== labels.length) throw new Error(`[neuron_theme] chart: series[${i}].values harus berisi ${labels.length} nilai (sejumlah labels).`); });
+      const targets = type === 'column' ? series.filter((sr) => sr.target) : [];
+      const main = series.filter((sr) => !targets.includes(sr));
+      if (focus !== undefined && focus !== -1 && !(Number.isInteger(focus) && focus >= 0 && focus < main.length))
+        throw new Error(`[neuron_theme] chart: focus ${focus} di luar rentang 0..${main.length - 1} (atau -1 tanpa sorotan).`);
+      if (main.length > 4) warn(`chart: ${main.length} seri; maksimal 4 — gabung ke "Lainnya" atau pecah grafik.`);
+      if (type === 'column' && main.length > 3) warn(`chart: kolom berkelompok ${main.length} seri; maksimal 3.`);
       const s = add('NEURON_ISI', notes);
       head(s, 'chart', chapter, t);
       const bottom = bottomOf(src);
-      const panel = keyValue !== undefined || keyText;
-      const cw = panel ? col(8) : W;
-      if (!Array.isArray(series) || !series.length) throw new Error('[neuron_theme] chart: series wajib berisi minimal 1 seri.');
-      if (focus !== undefined && focus !== -1 && !(Number.isInteger(focus) && focus >= 0 && focus < series.length))
-        throw new Error(`[neuron_theme] chart: focus ${focus} di luar rentang 0..${series.length - 1} (atau -1 tanpa sorotan).`);
-      const f = focus !== undefined ? focus : series.length > 1 ? 0 : -1;
-      const pointHi = highlight !== undefined && series.length === 1 && (type === 'column' || type === 'bar');
-      if (highlight !== undefined && !pointHi) warn('chart: highlight hanya untuk grafik batang/kolom satu seri; pakai focus untuk menyorot seri.');
-      if (pointHi && !(Number.isInteger(highlight) && highlight >= 0 && highlight < labels.length)) throw new Error(`[neuron_theme] chart: highlight ${highlight} di luar rentang kategori.`);
-      // warna: seri fokus merah, lainnya netral berurutan; satu seri tanpa fokus = 5B6470; satu seri + highlight = abu + 1 merah
-      const colors = f >= 0 ? series.map((_, i) => (i === f ? ACC : SERIES.slice(1)[(i > f ? i - 1 : i) % 3]))
-        : series.length === 1 ? [MUTED] : series.map((_, i) => NEUTRAL[i % 3]);
-      // satu sorotan merah per slide: bila ada titik/seri merah, angka panel memakai warna gelap
-      const redInChart = pointHi || f >= 0;
-      const PT = { bar: 'bar', column: 'bar', line: 'line', doughnut: 'doughnut' }[type];
-      if (!PT) throw new Error(`[neuron_theme] chart: type '${type}' tidak dikenal (column, bar, line, doughnut).`);
-      if (type === 'doughnut' && labels.length > 3) warn(`chart: donat ${labels.length} bagian; maksimal 3 — gabung "Lainnya" atau pakai batang.`);
-      if (type === 'column' && series.length > 3) warn(`chart: kolom berkelompok ${series.length} seri; maksimal 3.`);
-      // batang horizontal: kategori pertama digambar di bawah → dibalik agar urutan baca atas→bawah sama dengan data
-      const lab = type === 'bar' ? [...labels].reverse() : labels;
-      const data = series.map((sr) => ({ name: sr.name, labels: lab, values: type === 'bar' ? [...sr.values].reverse() : sr.values }));
+      const fmt = (v) => formatNum(v, numFmt);
       const axis = { color: MUTED, fontFace: FONT, fontSize: TYPE.chart };
-      // skala sumbu dikunci (batang/kolom mulai nol); grafik garis juga mengunci area plot agar label ujung tepat
-      const all = series.flatMap((sr) => sr.values.filter((v) => typeof v === 'number'));
-      const scale = niceScale(Math.min(0, ...all), Math.max(0, ...all));
-      const endLabels = type === 'line';
-      const box = { x: M, y: Z.bodyY, w: cw, h: bottom - Z.bodyY };
-      const layout = endLabels ? { x: 0.08, y: 0.04, w: Math.max(0.5, (cw - 1.3) / cw - 0.08), h: 0.84 } : undefined;
-      const opts = {
-        ...box, objectName: 'grafik', altText: plain(t),
-        chartColors: type === 'doughnut' ? [ACC, GREY, INK].slice(0, labels.length)
-          : pointHi ? lab.map((_, i) => (i === (type === 'bar' ? labels.length - 1 - highlight : highlight) ? ACC : GREY)) : colors,
-        barDir: type === 'bar' ? 'bar' : 'col', barGapWidthPct: 60, ...(layout ? { layout } : {}),
+      const common = {
+        objectName: 'grafik', altText: plain(t),
         catAxisLabelColor: axis.color, catAxisLabelFontFace: axis.fontFace, catAxisLabelFontSize: axis.fontSize,
         valAxisLabelColor: axis.color, valAxisLabelFontFace: axis.fontFace, valAxisLabelFontSize: axis.fontSize,
         catAxisLineShow: true, catAxisLineColor: RULE, catAxisLineSize: 0.75, valAxisLineShow: false, valAxisLabelFormatCode: numFmt,
         valGridLine: { color: RULE, size: 0.5 }, catGridLine: { style: 'none' },
         catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none', catAxisMinorTickMark: 'none', valAxisMinorTickMark: 'none',
-        ...(PT !== 'doughnut' ? { valAxisMinVal: scale.min, valAxisMaxVal: scale.max, valAxisMajorUnit: scale.step } : {}),
-        // label data langsung di ujung batang; sumbu nilai disembunyikan pada batang/kolom agar tidak dobel
-        showValue: PT === 'bar' ? showValue : type === 'doughnut', dataLabelFormatCode: type === 'doughnut' ? '0%' : numFmt,
-        dataLabelColor: INK, dataLabelFontFace: FONT, dataLabelFontSize: TYPE.chart, dataLabelPosition: 'outEnd',
-        valAxisHidden: PT === 'bar' && showValue, ...(PT === 'bar' && showValue ? { valGridLine: { style: 'none' } } : {}),
-        showLegend: (series.length > 1 && !endLabels) || type === 'doughnut', legendPos: 't', legendFontFace: FONT, legendFontSize: TYPE.chart, legendColor: MUTED,
-        lineDataSymbol: 'none',
-        ...(type === 'doughnut' ? { holeSize: 65, showPercent: true, showValue: false, showLabel: false, dataLabelColor: WHITE, dataBorder: { pt: 1, color: 'FFFFFF' } } : {}),
+        showLegend: false, legendFontFace: FONT, legendFontSize: TYPE.chart, legendColor: MUTED, legendPos: 't',
+        dataLabelFormatCode: numFmt, dataLabelColor: INK, dataLabelFontFace: FONT, dataLabelFontSize: TYPE.chart,
       };
-      if (endLabels) {
+      // legenda manual (kotak 0,12" + nama) — urutannya pasti sama dengan urutan seri
+      const legend = (items, y) => {
+        let x = M;
+        items.forEach(([name, color], i) => {
+          s.addShape('rect', { x, y: y + 0.05, w: 0.12, h: 0.12, fill: { color }, line: { type: 'none' }, objectName: `grafik-legenda-${i + 1}` });
+          s.addText(plain(name), base({ x: x + 0.18, y, w: 2.5, h: 0.22, fontSize: TYPE.chart, color: MUTED, valign: 'middle', objectName: `grafik-legenda-${i + 1}-teks` }));
+          x += 0.18 + plain(name).length * 0.07 + 0.3;
+        });
+      };
+
+      // --- donat: 2–3 bagian, irisan fokus merah mulai jam 12, persen fokus di tengah, daftar label di kanan ---
+      if (type === 'doughnut') {
+        const vals = main[0].values, total = vals.reduce((a, b) => a + b, 0);
+        if (labels.length > 3) warn(`chart: donat ${labels.length} bagian; maksimal 3 — gabung "Lainnya" atau pakai batang.`);
+        if (!(total > 0)) throw new Error('[neuron_theme] chart: donat butuh nilai positif.');
+        const fi = focus !== undefined && focus >= 0 ? focus : 0;
+        const order = labels.map((_, i) => i).sort((a, b) => (a === fi ? -1 : b === fi ? 1 : vals[b] - vals[a]));   // fokus pertama, lalu besar→kecil
+        const col3 = { [order[0]]: ACC, [order[1]]: GREY, [order[2]]: INK };
+        const d = Math.min(2.6, bottom - Z.bodyY - 0.1), cx = M + 0.3, cy = Z.bodyY + 0.05;
+        s.addChart('doughnut', [{ name: main[0].name, labels: order.map((i) => labels[i]), values: order.map((i) => vals[i]) }], {
+          ...common, x: cx, y: cy, w: d, h: d, holeSize: 65, firstSliceAng: 0, showValue: false, showPercent: false, showLabel: false,
+          chartColors: order.map((i) => col3[i] || MUTED), dataBorder: { pt: 1, color: 'FFFFFF' } });
+        const pct = (v) => `${formatNum((v / total) * 100, '0')}%`;
+        s.addText(pct(vals[fi]), base({ x: cx + d * 0.2, y: cy + d / 2 - 0.25, w: d * 0.6, h: 0.5, fontSize: TYPE.v.kpi, bold: true, color: ACC, align: 'center', valign: 'middle', objectName: 'grafik-donat-tengah' }));
+        const lx = cx + d + 0.5;
+        order.forEach((i, k) => {
+          const y = cy + 0.35 + k * 0.4;
+          s.addShape('rect', { x: lx, y: y + 0.06, w: 0.12, h: 0.12, fill: { color: col3[i] || MUTED }, line: { type: 'none' }, objectName: `grafik-donat-kunci-${k + 1}` });
+          s.addText([{ text: plain(labels[i]), options: { bold: i === fi } }], base({ x: lx + 0.22, y, w: 2.4, h: 0.24, fontSize: TYPE.v.node, color: TEXT, valign: 'middle', objectName: `grafik-donat-label-${k + 1}` }));
+          s.addText(pct(vals[i]), base({ x: lx + 2.6, y, w: 0.7, h: 0.24, fontSize: TYPE.v.node, bold: i === fi, color: TEXT, align: 'right', valign: 'middle', objectName: `grafik-donat-persen-${k + 1}` }));
+        });
+        if (keyText) {
+          const ky = cy + 0.35 + order.length * 0.4 + 0.25, kw = M + W - lx;
+          checkFit('chart.keyText', [keyText], kw, TYPE.body, bottom - ky);
+          s.addText(rich(keyText), base({ x: lx, y: ky, w: kw, h: bottom - ky, fontSize: TYPE.body, color: TEXT, valign: 'top', lineSpacingMultiple: 1.15, objectName: 'penjelasan' }));
+        }
+        source(s, src);
+        return finish(s);
+      }
+
+      // --- tumpuk 100% horizontal: segmen fokus menempel kiri, label % di dalam segmen, legenda atas ---
+      if (type === 'stacked100') {
+        if (labels.length > 5) warn(`chart: tumpuk 100% ${labels.length} batang; maksimal 5.`);
+        const fi = focus !== undefined && focus >= 0 ? focus : 0;
+        if (fi !== 0) warn('chart: tumpuk 100% — letakkan segmen fokus sebagai seri pertama (menempel sumbu kiri).');
+        const segCol = main.map((_, i) => (i === fi ? ACC : [GREY, INK, MUTED][(i > fi ? i - 1 : i) % 3]));
+        legend(main.map((sr, i) => [sr.name, segCol[i]]), Z.bodyY);
+        const box = { x: M, y: Z.bodyY + 0.35, w: W, h: bottom - Z.bodyY - 0.35 };
+        const layout = { x: 1.5 / W, y: 0.02, w: 1 - 1.5 / W - 0.01, h: 0.96 };
+        s.addChart('bar', main.map((sr) => ({ name: sr.name, labels: [...labels].reverse(), values: [...sr.values].reverse() })), {
+          ...common, ...box, layout, barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 50, chartColors: segCol,
+          valAxisHidden: true, valGridLine: { style: 'none' }, catAxisLineShow: false, showValue: false, dataBorder: { pt: 1, color: 'FFFFFF' } });
+        // label % manual (warna per segmen: putih di merah/gelap, 1F2937 di abu — kontras ≥ 4,5)
+        const px = box.x + layout.x * box.w, pw = layout.w * box.w, band = (layout.h * box.h) / labels.length, py = box.y + layout.y * box.h;
+        labels.forEach((_, r) => {
+          const sum = main.reduce((a, sr) => a + (sr.values[r] || 0), 0);
+          let acc = 0;
+          main.forEach((sr, i) => {
+            const p = sum ? (sr.values[r] || 0) / sum : 0, w = p * pw;
+            if (p >= 0.08 && w >= 0.45) s.addText(`${formatNum(p * 100, '0')}%`, base({ x: px + acc * pw, y: py + r * band, w, h: band, fontSize: TYPE.chart, bold: true,
+              color: segCol[i] === GREY ? INK : WHITE, align: 'center', valign: 'middle', objectName: `grafik-segmen-${r + 1}-${i + 1}` }));
+            acc += p;
+          });
+        });
+        source(s, src);
+        return finish(s);
+      }
+
+      // --- kolom / batang / garis ---
+      const panel = keyValue !== undefined || keyText;
+      const cw = panel ? col(8) : W;
+      const f = focus !== undefined ? focus : main.length > 1 ? 0 : -1;
+      const pointHi = highlight !== undefined && main.length === 1 && (type === 'column' || type === 'bar');
+      if (highlight !== undefined && !pointHi) warn('chart: highlight hanya untuk grafik batang/kolom satu seri; pakai focus untuk menyorot seri.');
+      if (pointHi && !(Number.isInteger(highlight) && highlight >= 0 && highlight < labels.length)) throw new Error(`[neuron_theme] chart: highlight ${highlight} di luar rentang kategori.`);
+      // warna: seri fokus merah, lainnya netral berurutan; satu seri tanpa fokus = 5B6470; satu seri + highlight = abu + 1 merah
+      const colors = f >= 0 ? main.map((_, i) => (i === f ? ACC : SERIES.slice(1)[(i > f ? i - 1 : i) % 3]))
+        : main.length === 1 ? [MUTED] : main.map((_, i) => NEUTRAL[i % 3]);
+      const redInChart = pointHi || f >= 0;   // satu sorotan merah per slide → angka panel gelap bila grafik sudah merah
+      // batang horizontal: kategori pertama digambar di bawah → dibalik agar urutan baca atas→bawah sama dengan data
+      const rev = type === 'bar';
+      const lab = rev ? [...labels].reverse() : labels;
+      const data = main.map((sr) => ({ name: sr.name, labels: lab, values: rev ? [...sr.values].reverse() : sr.values }));
+      const all = series.flatMap((sr) => sr.values.filter((v) => typeof v === 'number'));
+      const scale = niceScale(Math.min(0, ...all), Math.max(0, ...all));
+      const lockLabels = type === 'line' || targets.length > 0;   // label ujung (garis / target) butuh area plot terkunci
+      const multiLegend = type !== 'line' && main.length > 1;
+      if (multiLegend) legend(main.map((sr, i) => [sr.name, colors[i]]), Z.bodyY);
+      const box = { x: M, y: Z.bodyY + (multiLegend ? 0.35 : 0), w: cw, h: bottom - Z.bodyY - (multiLegend ? 0.35 : 0) };
+      const layout = lockLabels ? { x: 0.08, y: 0.06, w: Math.max(0.5, (cw - 1.3) / cw - 0.08), h: 0.82 } : undefined;
+      const manyBars = labels.length * main.length > 12;
+      const opts = {
+        ...common, ...box, ...(layout ? { layout } : {}),
+        valAxisMinVal: scale.min, valAxisMaxVal: scale.max, valAxisMajorUnit: scale.step, lineDataSymbol: 'none',
+      };
+      const barOpts = {
+        barDir: type === 'bar' ? 'bar' : 'col', barGapWidthPct: 60,
+        chartColors: pointHi ? lab.map((_, i) => (i === (rev ? labels.length - 1 - highlight : highlight) ? ACC : GREY)) : colors,
+        // label nilai di ujung batang; sumbu nilai disembunyikan agar tidak dobel (kecuali batang terlalu banyak)
+        showValue: showValue && !manyBars, dataLabelPosition: 'outEnd',
+      };
+      // dengan garis target, label nilai di ujung batang bertabrakan dengan garisnya → sumbu nilai + garis bantu saja
+      if (targets.length) barOpts.showValue = false;
+      const hideAxis = barOpts.showValue;
+      if (type === 'line') {
         // garis: satu tipe per seri (combo) agar tebal/putus-putus per seri — fokus 2,25 pt, lainnya 1,5 pt, dashed (target) 1 pt
-        s.addChart(series.map((sr, i) => ({ type: 'line', data: [data[i]], options: { chartColors: [sr.dashed ? MUTED : colors[i]],
+        s.addChart(main.map((sr, i) => ({ type: 'line', data: [data[i]], options: { chartColors: [sr.dashed ? MUTED : colors[i]],
           lineSize: i === f ? 2.25 : sr.dashed ? 1 : 1.5, lineDash: sr.dashed ? 'dash' : 'solid', lineDataSymbol: 'none' } })), opts);
-        visuals.lineEndLabels(s, { ...box, layout, min: scale.min, max: scale.max, series, focus: f, fmt: (v) => formatNum(v, numFmt) });
-      } else s.addChart(PT, data, opts);
+        visuals.lineEndLabels(s, { ...box, layout, min: scale.min, max: scale.max, series: main, focus: f, fmt });
+      } else if (targets.length) {
+        s.addChart([{ type: 'bar', data, options: barOpts },
+          ...targets.map((tg) => ({ type: 'line', data: [{ name: tg.name, labels: lab, values: tg.values }], options: { chartColors: [MUTED], lineSize: 1, lineDash: 'dash', lineDataSymbol: 'none' } }))],
+          { ...opts, valAxisHidden: hideAxis, ...(hideAxis ? { valGridLine: { style: 'none' } } : {}) });
+        visuals.lineEndLabels(s, { ...box, layout, min: scale.min, max: scale.max, series: targets, focus: -1, fmt });
+      } else {
+        s.addChart('bar', data, { ...opts, ...barOpts, valAxisHidden: hideAxis, ...(hideAxis ? { valGridLine: { style: 'none' } } : {}) });
+      }
       if (panel) {
         const px = colX(8) + 0.1, pw = col(4) - 0.1;
-        if (keyValue !== undefined) s.addText(String(keyValue), base({ x: px, y: Z.bodyY + 0.1, w: pw, h: 0.6, fontSize: TYPE.keyValue, bold: true, color: redInChart ? INK : ACC, valign: 'top', objectName: 'angka-kunci' }));
+        if (keyValue !== undefined) s.addText(nb(keyValue), base({ x: px, y: Z.bodyY + 0.1, w: pw, h: 0.6, fontSize: TYPE.keyValue, bold: true, color: redInChart ? INK : ACC, valign: 'top', objectName: 'angka-kunci' }));
         if (keyText) {
           checkFit('chart.keyText', [keyText], pw, TYPE.body, bottom - Z.bodyY - 0.85);
           s.addText(rich(keyText), base({ x: px, y: Z.bodyY + 0.85, w: pw, h: bottom - Z.bodyY - 0.85, fontSize: TYPE.body, color: TEXT, valign: 'top', lineSpacingMultiple: 1.15, objectName: 'penjelasan' }));
@@ -493,21 +594,27 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
 
     // 9. Angka penting — "Berapa angkanya dan apa artinya?" stats: [{ value, label, note }]; highlight: indeks merah.
     stats({ chapter, title: t, stats = [], highlight = 0, explanation, source: src, notes } = {}) {
-      if (stats.length > 3) warn(`stats: ${stats.length} angka; maksimal 3 per slide.`);
+      if (stats.length > 4) warn(`stats: ${stats.length} angka; maksimal 4 per slide (3 bila tanpa ikon).`);
       const s = add('NEURON_ISI', notes);
       head(s, 'stats', chapter, t);
-      const one = stats.length === 1;
-      const cw = one ? col(6) : col(4);
-      const big = one ? TYPE.statOne : TYPE.stat, vh = big / 72 * 1.25;
-      // blok angka (angka + label + keterangan) diletakkan di tengah vertikal zona isi
-      const blockH = vh + 0.12 + 0.36 + Math.max(0, ...stats.map((st) => (st && st.note ? textH(st.note, cw, TYPE.small) : 0)));
+      const n = stats.length, one = n === 1, four = n >= 4;
+      // hierarki angka (V3): 1 angka 54 pt · 2–3 angka 40 pt · 4 angka 32 pt; satu ukuran & satu angka merah per slide
+      const cw = one ? col(6) : four ? col(3) : col(4);
+      const big = one ? TYPE.statOne : four ? TYPE.keyValue : TYPE.stat, vh = big / 72 * 1.25;
+      const hasIcon = stats.some((st) => st && st.icon), iconS = 0.4, ih = hasIcon ? iconS + 0.15 : 0;
+      const icons = hasIcon ? loadIcons() : null;
+      // blok (ikon + angka + label + keterangan) di tengah vertikal zona isi
+      const blockH = ih + vh + 0.12 + 0.36 + Math.max(0, ...stats.map((st) => (st && st.note ? textH(st.note, cw, TYPE.small) : 0)));
       const top = Z.bodyY + Math.max(0, (bottomOf(src) - Z.bodyY - blockH) / 2 - 0.1);
       stats.forEach((st, i) => {
         need(st && st.value, `stats: stats[${i}].value`);
-        const x = one ? M : colX(i * 4);
+        const x = one ? M : colX(i * (four ? 3 : 4));
         if (st.label && lines(st.label, cw, TYPE.body, true) > 1) warn(`stats: label angka ${i + 1} lebih dari 1 baris — persingkat.`);
-        s.addText(nb(st.value), base({ x, y: top, w: cw, h: vh, fontSize: big, bold: true, color: i === highlight ? ACC : INK, valign: 'bottom', objectName: `angka-${i + 1}` }));
-        let y = top + vh + 0.12;
+        if (lines(st.value, cw, big, true) > 1) warn(`stats: angka ${i + 1} ("${st.value}") terlalu lebar untuk kolomnya — persingkat (mis. "Rp 1,2 M").`);
+        if (st.icon && icons) icons.icon(s, st.icon, { x, y: top, size: iconS, color: INK, objectName: `ikon-angka-${i + 1}` });
+        const vy = top + ih;
+        s.addText(nb(st.value), base({ x, y: vy, w: cw, h: vh, fontSize: big, bold: true, color: i === highlight ? ACC : INK, valign: 'bottom', objectName: `angka-${i + 1}` }));
+        let y = vy + vh + 0.12;
         if (st.label) { s.addText(rich(st.label), base({ x, y, w: cw, h: 0.3, fontSize: TYPE.body, bold: true, color: INK, valign: 'top', objectName: `label-angka-${i + 1}` })); y += 0.36; }
         if (st.note) s.addText(rich(st.note), base({ x, y, w: cw, h: 0.6, fontSize: TYPE.small, color: MUTED, valign: 'top', lineSpacingMultiple: 1.15, objectName: `ket-angka-${i + 1}` }));
       });
@@ -552,7 +659,10 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
     },
 
     // Visualisasi (neuron_visuals.js): diagram proses, matriks 2×2, arsitektur C4 — lihat SKILL.md.
-    process: visuals.process, matrix: visuals.matrix, architecture: visuals.architecture,
+    process: visuals.process, cycle: visuals.cycle, timeline: visuals.timeline, orgChart: visuals.orgChart,
+    compare: visuals.compare, pyramid: visuals.pyramid, funnel: visuals.funnel, matrix: visuals.matrix, architecture: visuals.architecture,
+    // Ikon garis (Lucide, bentuk native) pada slide hasil fungsi tema: deck.icon(slide, 'users', { x, y, size, color }).
+    icon(slide, name, opts) { const m = loadIcons(); if (!m) throw new Error('[neuron_theme] ikon tidak tersedia (scripts/neuron_icons.js hilang).'); return m.icon(slide, name, opts); },
 
     // Menulis berkas, merapikan XML, menerapkan tema Neuron. Mengembalikan path berkas (pptxgenjs menambah .pptx bila tidak ada).
     async save(out) {

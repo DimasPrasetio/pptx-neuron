@@ -32,11 +32,13 @@ z = zipfile.ZipFile(sys.argv[1])
 slides = [n for n in z.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)]
 bad = [n for n in slides if re.search(r"</a:r><a:pPr", z.read(n).decode())]
 assert not bad, f"pPr di tengah paragraf: {bad}"
-assert len(slides) == 12, f"jumlah slide {len(slides)}, harus 12"
+assert len(slides) >= 30, f"jumlah slide {len(slides)}, contoh lengkap harus >= 30"
+open(sys.argv[1] + ".n", "w").write(str(len(slides)))
 theme = z.read("ppt/theme/theme1.xml").decode()
 assert 'B3121B' in theme and 'name="Neuron"' in theme, "tema Neuron belum diterapkan"
 PY
-ok "12 slide, tanpa pPr ganda, tema Neuron terpasang"
+N=$(cat "$OUT/contoh.pptx.n")
+ok "$N slide, tanpa pPr ganda, tema Neuron terpasang"
 
 echo "3. Baca isi"
 python3 "$S/read_pptx.py" "$OUT/contoh.pptx" > "$OUT/isi.md"
@@ -48,7 +50,9 @@ ok "read_pptx.py (judul, tabel, grafik, alt text, catatan)"
 echo "4. Edit presentasi yang sudah ada"
 rm -rf "$OUT/unpacked"
 python3 -c "import sys,zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$OUT/contoh.pptx" "$OUT/unpacked"
-NEW=$(python3 "$S/add_slide.py" "$OUT/unpacked" slide4.xml --after slide4.xml | grep -o 'ppt/slides/slide[0-9]*\.xml' | head -1)
+SRC=$(grep -l "Opname bulanan menghentikan pengiriman" "$OUT"/unpacked/ppt/slides/slide*.xml | head -1 | xargs basename)
+[ -n "$SRC" ] || gagal "slide sumber untuk uji edit tidak ditemukan"
+NEW=$(python3 "$S/add_slide.py" "$OUT/unpacked" "$SRC" --after "$SRC" | grep -o 'ppt/slides/slide[0-9]*\.xml' | head -1)
 [ -n "$NEW" ] || gagal "add_slide.py"
 python3 - "$OUT/unpacked" "$NEW" <<'PY' || gagal "ubah teks / hapus slide"
 import re, sys, pathlib
@@ -57,10 +61,11 @@ p = root / new
 x = p.read_text(encoding="utf-8")
 assert "Opname bulanan menghentikan pengiriman" in x
 p.write_text(x.replace("Opname bulanan menghentikan pengiriman", "Opname mingguan menghentikan pengiriman"), encoding="utf-8")
-# hapus pembatas bab terakhir (slide10.xml) dari urutan slide; clean.py membuang berkasnya
+# hapus pembatas bab "04" dari urutan slide; clean.py membuang berkasnya
 pres = root / "ppt/presentation.xml"
 rels = (root / "ppt/_rels/presentation.xml.rels").read_text(encoding="utf-8")
-rid = re.search(r'Id="(rId\d+)"[^>]*Target="slides/slide10\.xml"|Target="slides/slide10\.xml"[^>]*Id="(rId\d+)"', rels)
+target = next(f.name for f in sorted((root / "ppt/slides").glob("slide*.xml")) if 'name="nomor-bab"' in f.read_text(encoding="utf-8") and ">04<" in f.read_text(encoding="utf-8"))
+rid = re.search(r'Id="(rId\d+)"[^>]*Target="slides/%s"|Target="slides/%s"[^>]*Id="(rId\d+)"' % (target, target), rels)
 rid = next(g for g in rid.groups() if g)
 px = pres.read_text(encoding="utf-8")
 px2 = re.sub(r'<p:sldId [^>]*r:id="%s"/>' % rid, "", px)
@@ -71,7 +76,7 @@ python3 "$S/clean.py" "$OUT/unpacked" > /dev/null
 (cd "$OUT/unpacked" && rm -f ../edit.pptx && zip -qXr ../edit.pptx .)
 python3 "$S/office/validate.py" "$OUT/edit.pptx" --original "$OUT/contoh.pptx" | tail -1 | grep -q PASSED || gagal "validate.py hasil edit"
 python3 "$S/read_pptx.py" "$OUT/edit.pptx" > "$OUT/isi-edit.md"
-[ "$(grep -c '<!-- Slide number' "$OUT/isi-edit.md")" = 12 ] || gagal "jumlah slide hasil edit harus 12 (12 + 1 duplikat - 1 dihapus)"
+[ "$(grep -c '<!-- Slide number' "$OUT/isi-edit.md")" = "$N" ] || gagal "jumlah slide hasil edit harus $N (+1 duplikat −1 dihapus)"
 grep -q "Opname mingguan" "$OUT/isi-edit.md" || gagal "teks hasil edit tidak terbaca"
 [ "$(grep -c 'Opname bulanan menghentikan' "$OUT/isi-edit.md")" = 1 ] || gagal "slide asal ikut berubah"
 ok "duplikasi slide, ubah teks, hapus slide, clean, validasi --original"
@@ -79,9 +84,9 @@ ok "duplikasi slide, ubah teks, hapus slide, clean, validasi --original"
 echo "5. Render"
 if bash "$S/render.sh" "$OUT/edit.pptx" "$OUT/render" > "$OUT/render.log" 2>&1; then
   n=$(ls "$OUT"/render/slide-*.jpg | wc -l | tr -d ' ')
-  [ "$n" = 12 ] || gagal "render menghasilkan $n gambar, harus 12"
+  [ "$n" = "$N" ] || gagal "render menghasilkan $n gambar, harus $N"
   [ "$OUT/render/edit.pdf" -nt "$OUT/edit.pptx" ] || gagal "PDF render lebih lama dari berkas"
-  ok "render 12 slide -> $OUT/render/"
+  ok "render $N slide -> $OUT/render/"
 else
   code=$?; [ $code -eq 2 ] && echo "  [LEWAT] LibreOffice/Poppler tidak ada: tampilan belum diperiksa" || { cat "$OUT/render.log"; gagal "render.sh"; }
 fi
