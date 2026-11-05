@@ -202,11 +202,11 @@ const bez = (p0, g, t) => {
   const sps = s1.match(/<p:sp>(?:(?!<\/p:sp>)[\s\S])*?<\/p:sp>/g).filter((x) => /name="ikon-/.test(x));
   assert.strictEqual(sps.length, names.length);
   for (const sp of sps) {
-    assert(/<a:custGeom>/.test(sp) && /<\/a:custGeom><a:noFill\/><a:ln w="30480"><a:solidFill><a:srgbClr val="1F2937"\/>/.test(sp), 'custGeom tanpa isian, garis 2,4 pt 1F2937');
+    assert(/<a:custGeom>/.test(sp) && /<\/a:custGeom><a:noFill\/><a:ln w="30480"[^>]*><a:solidFill><a:srgbClr val="1F2937"\/>/.test(sp), 'custGeom tanpa isian, garis 2,4 pt 1F2937');
     assert.strictEqual((sp.match(/<a:path /g) || []).length, 1);
   }
   const s3 = await z.file('ppt/slides/slide3.xml').async('string');
-  assert.strictEqual((s3.match(/name="ikon-[^"]*"[\s\S]*?<a:ln w="30480"><a:solidFill><a:srgbClr val="FFFFFF"\/>/g) || []).length, names.length, 'ikon putih di latar gelap');
+  assert.strictEqual((s3.match(/name="ikon-[^"]*"[\s\S]*?<a:ln w="30480"[^>]*><a:solidFill><a:srgbClr val="FFFFFF"\/>/g) || []).length, names.length, 'ikon putih di latar gelap');
   const b1 = await (await JSZip.loadAsync(fs.readFileSync(bulat))).file('ppt/slides/slide1.xml').async('string');
   assert.strictEqual((b1.match(/cap="rnd"/g) || []).length, names.length);
   ok(`deck ${path.basename(file)} (4 slide: ${names.length} ikon × 3 + ${detail.length} detail) + ikon-bulat.pptx; XML: 1 custGeom/ikon, noFill, garis 1F2937`);

@@ -140,6 +140,7 @@ const miniStrokes = (slide, x, y, name = 'motif-mini') => strokes(slide, { x, y,
 //    menghapus bullet. pPr hanya boleh menjadi anak pertama <a:p>: buang setiap pPr yang mengikuti run/br/fld.
 // 2. ID shape (<p:cNvPr id>) dinomori ulang per slide/layout: pptxgenjs bisa memberi id ganda (nomor slide vs objek ke-24).
 // 3. Format angka grafik diberi penanda bahasa Indonesia [$-421] agar desimal/ribuan tampil "4,8" / "1.410".
+// 3b. Ikon (shape bernama "ikon-…") diberi ujung & sambungan garis bulat seperti Lucide.
 // 4. Tema: palet warna, nama tema, dan nama skema huruf Neuron ditulis ke ppt/theme/theme*.xml
 //    (pptxgenjs hanya menulis huruf; tanpa ini warna skema = palet Office).
 const SLOTS = ['dk1', 'lt1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6', 'hlink', 'folHlink'];
@@ -153,7 +154,9 @@ async function finalize(file) {
         let x = xml, prev;
         do { prev = x; x = x.replace(pPr, '$1'); } while (x !== prev);
         let id = 0;
-        return x.replace(/(<p:cNvPr\b[^>]*?\bid=")\d+(")/g, (m, a, b) => `${a}${++id}${b}`);
+        x = x.replace(/(<p:cNvPr\b[^>]*?\bid=")\d+(")/g, (m, a, b) => `${a}${++id}${b}`);
+        // ikon Lucide: ujung & sambungan garis bulat (pptxgenjs tidak punya opsinya)
+        return x.includes('name="ikon-') ? loadIcons().roundIconLines(x) : x;
       });
     } else if (/^ppt\/charts\/chart\d+\.xml$/.test(name)) {
       await edit(name, (xml) => {

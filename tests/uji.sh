@@ -23,6 +23,11 @@ node "$ROOT/tests/tepi.js" "$OUT/tepi" || gagal "tests/tepi.js"
 python3 "$S/office/validate.py" "$OUT/tepi/tepi.pptx" | tail -1 | grep -q PASSED || gagal "validate.py deck tepi"
 ok "deck tepi valid"
 
+echo "1c. Ikon Lucide (bentuk native)"
+node "$ROOT/tests/ikon.js" "$OUT/ikon" > "$OUT/ikon.log" 2>&1 || { cat "$OUT/ikon.log"; gagal "tests/ikon.js"; }
+python3 "$S/office/validate.py" "$OUT/ikon/ikon.pptx" | tail -1 | grep -q PASSED || gagal "validate.py deck ikon"
+ok "ikon: $(tail -1 "$OUT/ikon.log")"
+
 echo "2. Validasi struktur"
 python3 "$S/office/validate.py" "$OUT/contoh.pptx" | tail -1 | grep -q PASSED || gagal "validate.py contoh"
 ok "validate.py"
