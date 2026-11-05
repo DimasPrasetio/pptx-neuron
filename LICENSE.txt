@@ -1,0 +1,10 @@
+pptx-neuron
+Dibuat oleh Dimas Prasetio untuk Neuronworks Indonesia.
+
+Desain presentasi, scripts/neuron_theme.js, motif Tiga Goresan, dan logo Neuron (assets/logo_neuron.png) adalah
+milik Neuronworks Indonesia. Logo Neuron adalah identitas merek Neuronworks dan tidak boleh dipakai untuk
+presentasi di luar Neuronworks Indonesia.
+
+Komponen pihak ketiga yang dibundel tetap tunduk pada lisensinya masing-masing:
+- scripts/vendor/pptxgenjs.bundle.cjs (pustaka pptxgenjs dan dependensinya): lihat THIRD_PARTY_NOTICES.txt
+- scripts/office/, add_slide.py, clean.py, slide_text.py, thumbnail.py, apply_theme.js: berasal dari skill pptx Anthropic
