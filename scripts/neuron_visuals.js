@@ -5,6 +5,32 @@
 //
 // Modul ini dipanggil dari neuron_theme.js (createDeck) dengan konteks bersama; jangan di-require langsung.
 
+// Lebar huruf Arial/Helvetica (metrik AFM, 1/1000 em) untuk ASCII 32–126, biasa dan tebal. LibreOffice (Liberation Sans,
+// metrik setara Arial) dan PowerPoint membungkus teks menurut lebar ini, jadi perkiraan baris isi simpul memakai tabel lengkap.
+const AFM_CHARS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+const AFM_R = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015,
+  667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333,
+  556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584];
+const AFM_B = [278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975,
+  722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333,
+  556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584];
+if (AFM_R.length !== AFM_CHARS.length || AFM_B.length !== AFM_CHARS.length) throw new Error('[neuron_visuals] tabel lebar huruf rusak');
+const AFM = { r: {}, b: {} };
+[...AFM_CHARS].forEach((c, i) => { AFM.r[c] = AFM_R[i] / 1000; AFM.b[c] = AFM_B[i] / 1000; });
+AFM.r['·'] = AFM.b['·'] = 0.278; AFM.r['\u00A0'] = AFM.b['\u00A0'] = 0.278;
+const charW = (ch, pt, bold) => ((bold ? AFM.b : AFM.r)[ch] ?? 0.556) * pt / 72;   // huruf di luar ASCII ≈ lebar rata-rata
+// Jumlah baris dengan pembungkusan PER KATA (spasi di akhir baris tidak dihitung), seperti PowerPoint/LibreOffice.
+function wrapLines(text, wIn, pt, bold = false) {
+  const width = (str) => [...str].reduce((a, c) => a + charW(c, pt, bold), 0);
+  let n = 1, cur = 0;
+  for (const word of String(text).replace(/\*\*/g, '').split(/[ \t\n]+/).filter(Boolean)) {
+    const ww = width(word);
+    if (cur === 0) cur = ww; else if (cur + charW(' ', pt, bold) + ww <= wIn) cur += charW(' ', pt, bold) + ww; else { n++; cur = ww; }
+    while (cur > wIn) { n++; cur -= wIn; }   // kata lebih panjang dari baris
+  }
+  return n;
+}
+
 function build(ctx) {
   const { add, head, finish, source, bottomOf, base, rich, nb, plain, lines, textH, warn, need, T, TYPE, M, W, Z, GAP, col, colX, formatNum } = ctx;
   const { ACC, INK, MUTED, TEXT, RULE, ZEBRA, GREY, WHITE } = T;
@@ -28,28 +54,6 @@ function build(ctx) {
   const LH = 1.15;
   // bantalan atas: silinder (preset can) punya tutup elips setinggi 25% sisi terpendek → teks mulai di tengah tutup
   const padTop = (kind, w, h) => (kind === 'db' ? Math.min(0.14, 0.125 * Math.min(w, h) + 0.04) : 0.06);
-  // Jumlah baris dengan pembungkusan PER KATA memakai tabel lebar huruf Arial (biasa/tebal)
-  // — lebih tepat daripada perkiraan jumlah huruf untuk teks pendek di kotak sempit.
-  const wrapLines = (text, wIn, pt, bold = false) => {
-    // lebar huruf Arial (em) biasa / tebal
-    const R = { ' ': 0.278, i: 0.222, l: 0.222, j: 0.222, f: 0.278, t: 0.278, r: 0.333, m: 0.833, w: 0.722, I: 0.278, M: 0.833, W: 0.944, '.': 0.278, ',': 0.278, ':': 0.278, '·': 0.278, '[': 0.278, ']': 0.278, '(': 0.333, ')': 0.333, '&': 0.667, '/': 0.278, '-': 0.333 };
-    const B = { ' ': 0.278, i: 0.278, l: 0.278, j: 0.278, f: 0.333, t: 0.333, r: 0.389, m: 0.889, w: 0.778, I: 0.278, M: 0.833, W: 0.944, '.': 0.278, ',': 0.278, ':': 0.333, '·': 0.278, '[': 0.333, ']': 0.333, '(': 0.333, ')': 0.333, '&': 0.722, '/': 0.278, '-': 0.333 };
-    const cw = (ch) => {
-      const t = bold ? B : R;
-      const em = ch in t ? t[ch]
-        : /[EPSXYZ]/.test(ch) ? 0.667 : /[FTL]/.test(ch) ? (bold ? 0.611 : 0.556) : /[A-Z]/.test(ch) ? 0.722
-        : /[0-9]/.test(ch) ? 0.556 : /[aceksvxyz]/.test(ch) ? (bold ? 0.556 : 0.5) : bold ? 0.611 : 0.556;
-      return em * pt / 72;
-    };
-    const width = (str) => [...str].reduce((a, ch) => a + cw(ch), 0);
-    let n = 1, cur = 0;
-    for (const word of plain(text).split(/\s+/).filter(Boolean)) {
-      const ww = width(word);
-      if (cur === 0) cur = ww; else if (cur + cw(' ') + ww <= wIn) cur += cw(' ') + ww; else { n++; cur = ww; }
-      while (cur > wIn) { n++; cur -= wIn; }   // kata lebih panjang dari baris
-    }
-    return n;
-  };
   const nodeNeed = ({ w, h, title, tag, desc, kind }) => padTop(kind, w, h)
     + (wrapLines(title, w - 0.16, V.node, true) * V.node * LH + (tag ? wrapLines(`[${tag}]`, w - 0.16, V.tag) * V.tag * LH : 0)
       + (desc ? wrapLines(desc, w - 0.16, V.tag) * V.tag * LH : 0)) / 72;
@@ -548,4 +552,4 @@ function build(ctx) {
   };
 }
 
-module.exports = { build };
+module.exports = { build, wrapLines };

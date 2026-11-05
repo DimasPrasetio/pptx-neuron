@@ -54,6 +54,14 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
   assert.strictEqual(T.formatNum(4.8, '"Rp "#,##0.0" jt"'), 'Rp 4,8 jt');
   assert.strictEqual(T.formatNum(12400, '#,##0'), '12.400');
   ok('formatNum: persen ×100, awalan/akhiran literal, ribuan titik');
+  // pembungkusan isi simpul dengan lebar huruf Arial (vektor dicocokkan dengan render LibreOffice pada lebar 1,34")
+  const { wrapLines } = require(path.join(__dirname, '..', 'scripts', 'neuron_visuals.js'));
+  for (const [t, pt, b, n] of [['[Kontainer · SQL Server]', 9, false, 2], ['[Kontainer · ClickHouse]', 9, false, 2], ['Agregasi data penjualan', 9, false, 2],
+    ['Pelanggan Order', 12, true, 2], ['BPJS Kesehatan', 12, true, 1], ['Jasa Pengiriman', 12, true, 1], ['Mesin Vault BCA', 12, true, 1],
+    ['Aplikasi pemindai gudang', 12, true, 3], ['API GUDANG WMS', 12, true, 2], ['ERP perusahaan', 12, true, 1]]) {
+    assert.strictEqual(wrapLines(t, 1.34, pt, b), n, `wrapLines("${t}", ${pt} pt${b ? ' tebal' : ''}) harus ${n} baris`);
+  }
+  ok('pembungkusan isi simpul per kata dengan lebar huruf Arial (10 vektor dari render)');
 
   // --- peringatan meluap ---
   warnings.length = 0;
