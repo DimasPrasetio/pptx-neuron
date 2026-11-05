@@ -201,7 +201,7 @@ function formatNum(v, numFmt = '#,##0') {
   if (!/[0#]/.test(core)) warn(`format angka "${numFmt}" tidak dikenali — label di luar grafik memakai #,##0.`);
   const n = new Intl.NumberFormat('id-ID', { minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: core.includes(',') || !/^0+(\.0+)?%?$/.test(core) })
     .format(pct ? v * 100 : v);
-  return `${prefix}${n}${pct ? '%' : ''}${suffix}`;
+  return `${prefix}${n.replace(/^-/, '−')}${pct ? '%' : ''}${suffix}`;   // tanda minus tipografis
 }
 
 // Ikon Lucide sebagai bentuk native (scripts/neuron_icons.js). Dimuat saat dipakai; bila modul tidak ada, ikon dilewati.
@@ -496,7 +496,8 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
         if (labels.length > 5) warn(`chart: tumpuk 100% ${labels.length} batang; maksimal 5.`);
         const fi = focus === -1 ? -1 : focus !== undefined ? focus : 0;
         if (fi > 0) warn('chart: tumpuk 100% — letakkan segmen fokus sebagai seri pertama (menempel sumbu kiri).');
-        const segCol = main.map((_, i) => (i === fi ? ACC : fi >= 0 ? [GREY, INK, MUTED][(i > fi ? i - 1 : i) % 3] : NEUTRAL[i % 3]));
+        if (fi < 0 && main.length > 3) warn('chart: tumpuk 100% tanpa fokus maks. 3 segmen berwarna berbeda — segmen ke-4 memakai C9CDD3.');
+        const segCol = main.map((_, i) => (i === fi ? ACC : fi >= 0 ? [GREY, INK, MUTED][(i > fi ? i - 1 : i) % 3] : [INK, GREY, MUTED, RULE][i % 4]));
         legend(main.map((sr, i) => [sr.name, segCol[i]]), Z.bodyY);
         const box = { x: M, y: Z.bodyY + 0.35, w: W, h: bottom - Z.bodyY - 0.35 };
         const layout = { x: 1.5 / W, y: 0.02, w: 1 - 1.5 / W - 0.01, h: 0.96 };
@@ -511,8 +512,8 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
           main.forEach((sr, i) => {
             const p = sum ? (sr.values[r] || 0) / sum : 0, w = p * pw;
             // di atas abu 8C939D teks gelap minimal 12 pt tebal (kontras teks besar); segmen lain 10 pt putih
-            if (p >= 0.08 && w >= 0.45) s.addText(`${formatNum(p * 100, '0')}%`, base({ x: px + acc * pw, y: py + r * band, w, h: band, fontSize: segCol[i] === GREY ? 12 : TYPE.chart, bold: true,
-              color: segCol[i] === GREY ? INK : WHITE, align: 'center', valign: 'middle', objectName: `grafik-segmen-${r + 1}-${i + 1}` }));
+            if (p >= 0.08 && w >= 0.45) s.addText(`${formatNum(p * 100, '0')}%`, base({ x: px + acc * pw, y: py + r * band, w, h: band, fontSize: segCol[i] === GREY || segCol[i] === RULE ? 12 : TYPE.chart, bold: true,
+              color: segCol[i] === GREY || segCol[i] === RULE ? INK : WHITE, align: 'center', valign: 'middle', objectName: `grafik-segmen-${r + 1}-${i + 1}` }));
             acc += p;
           });
         });
@@ -623,10 +624,11 @@ function createDeck({ title = 'Presentasi Neuron', author = 'Neuronworks Indones
     // 9. Angka penting — "Berapa angkanya dan apa artinya?" stats: [{ value, label, note }]; highlight: indeks merah.
     stats({ chapter, title: t, stats = [], highlight = 0, explanation, source: src, notes } = {}) {
       if (stats.length > 4) warn(`stats: ${stats.length} angka; maksimal 4 per slide (3 bila tanpa ikon).`);
-      const s = add('NEURON_ISI', notes);
-      head(s, 'stats', chapter, t);
       const n = stats.length, one = n === 1, four = n >= 4;
       if (highlight !== -1 && n && !(Number.isInteger(highlight) && highlight >= 0 && highlight < n)) throw new Error(`[neuron_theme] stats: highlight ${highlight} di luar rentang 0..${n - 1} (atau -1 tanpa sorotan).`);
+      stats.forEach((st, i) => need(st && st.value, `stats: stats[${i}].value`));
+      const s = add('NEURON_ISI', notes);
+      head(s, 'stats', chapter, t);
       // hierarki angka (V3): 1 angka 54 pt · 2–3 angka 40 pt · 4 angka 32 pt; satu ukuran & satu angka merah per slide
       const cw = one ? col(6) : four ? col(3) : col(4);
       const big = one ? TYPE.statOne : four ? TYPE.keyValue : TYPE.stat, vh = big / 72 * 1.25;

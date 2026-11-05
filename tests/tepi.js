@@ -58,11 +58,16 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
   d.chart({ title: 'Batang', type: 'bar', labels: ['x', 'y'], series: [{ name: 'a', values: [1000.5, 2000] }], highlight: 1 });
   d.chart({ title: 'Donat fokus 1', type: 'doughnut', labels: ['A', 'B', 'C'], series: [{ name: 's', values: [5, 3, 2] }], focus: 1 });
   d.chart({ title: 'Donat tanpa sorotan', type: 'doughnut', labels: ['A', 'B'], series: [{ name: 's', values: [6, 4] }], focus: -1 });
-  throws(() => d0.architecture({ title: 'x', caption: 'c', boundary: { label: 'b', cols: [1, 2] }, source: 's', nodes: [0, 1, 2].map((r) => ({ id: `n${r}`, title: 'N', col: 1, row: r })) }), /tidak muat/, 'arsitektur 3 baris terlalu padat');
-  d.architecture({ title: 'Arsitektur tiga baris padat', legend: false, boundary: { label: 'Batas', cols: [1, 2] },
+  throws(() => d0.architecture({ title: 'x', caption: 'c', columns: ['a', 'b', 'c', 'd'], boundary: { label: 'b', cols: [1, 2] }, legend: true, source: 's', nodes: [0, 1, 2].map((r) => ({ id: `n${r}`, title: 'N', col: 1, row: r })) }), /tidak muat/, 'arsitektur 3 baris terlalu padat');
+  // C4 kontainer 3 baris yang patuh brief (caption + batas + kunci) harus muat
+  d.architecture({ title: 'Arsitektur tiga baris padat', caption: 'Diagram kontainer · Uji', boundary: { label: 'Batas', cols: [1, 2] },
     nodes: [{ id: 'u', title: 'Pengguna', kind: 'person', col: 0, row: 0 }, { id: 'w', title: 'Web', col: 1, row: 0 }, { id: 'a', title: 'API', kind: 'main', col: 1, row: 1 },
       { id: 'd', title: 'DB', kind: 'db', col: 1, row: 2 }, { id: 'x', title: 'Luar', kind: 'external', col: 3, row: 1 }],
     links: [{ from: 'u', to: 'w', label: 'Pakai' }, { from: 'w', to: 'a', label: 'JSON' }, { from: 'a', to: 'd', label: 'SQL' }, { from: 'a', to: 'x', label: 'REST' }] });
+  // konteks: sistem kami bentang 3 baris dengan orang di 3 baris → tinggi tidak diringkas, garis tetap lurus
+  d.architecture({ title: 'Konteks tiga baris', nodes: [0, 1, 2].map((r) => ({ id: `o${r}`, title: `Orang ${r}`, kind: 'person', col: 0, row: r }))
+      .concat([{ id: 'sys', title: 'Sistem', kind: 'main', col: 1, colSpan: 2, row: 0, rowSpan: 3 }, { id: 'e0', title: 'Luar', kind: 'external', col: 3, row: 0 }]),
+    links: [0, 1, 2].map((r) => ({ from: `o${r}`, to: 'sys', label: 'Memakai' })).concat([{ from: 'sys', to: 'e0', label: 'Kirim' }]) });
   d.pyramid({ title: 'Piramida', layers: ['A', 'B', 'C'] });
   d.funnel({ title: 'Corong dengan nol', stages: [{ name: 'a', value: 10 }, { name: 'b', value: 0 }, { name: 'c', value: 0 }] });
   d.closing({ steps: ['Satu'] });
@@ -87,7 +92,9 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
   assert(py && (py.match(/<a:custGeom>/g) || []).length >= 3 && !/prst="trapezoid"/.test(py), 'piramida dari custGeom, bukan trapesium preset');
   const ar = bySlideTitle('Arsitektur tiga baris padat');
   for (const m of ar.matchAll(/name="diagram-aliran-\d+(?:-\d+)?"[\s\S]*?<a:xfrm( flipV="1")?( flipH="1")?[^>]*>/g)) assert(!m[1], 'panah vertikal arsitektur tidak terbalik');
-  ok('donat focus 1 / -1, piramida custGeom, arsitektur 3 baris tanpa panah terbalik, tanpa NaN/undefined');
+  const cx3 = bySlideTitle('Konteks tiga baris');
+  assert(cx3 && !/diagram-aliran-\d+-2"/.test(cx3), 'konteks 3 baris: semua garis lurus (tanpa siku)');
+  ok('donat focus 1 / -1, piramida custGeom, arsitektur 3 baris (C4 + konteks) rapi, tanpa NaN/undefined');
   ok(`section PowerPoint: ${sections.map(([s, c]) => `${s}=${c}`).join(', ')}`);
 
   const app = await read('docProps/app.xml');

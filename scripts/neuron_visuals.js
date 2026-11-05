@@ -131,6 +131,8 @@ function build(ctx) {
     // keyPoint: panel Inti satu baris di bawah.
     timeline({ chapter, title: t, milestones, phases, periods = [], today, keyPoint, source: src, notes } = {}) {
       if (!milestones && !phases) throw new Error('[neuron_theme] timeline: isi milestones atau phases.');
+      if (phases && !periods.length) throw new Error('[neuron_theme] timeline: phases butuh periods.');
+      if (phases && today !== undefined && !(today >= 0 && today <= periods.length)) throw new Error(`[neuron_theme] timeline: today ${today} di luar 0..${periods.length}.`);
       const s = add('NEURON_ISI', notes);
       head(s, 'timeline', chapter, t);
       const bottom = keyPoint ? keyPanel(s, src, keyPoint) : bottomOf(src);
@@ -325,7 +327,13 @@ function build(ctx) {
         let bx, al, by = cy - 0.11, bh = 0.22;
         if (cx + 0.1 + lw <= qx1 - 0.04) { bx = cx + 0.1; al = 'left'; }
         else if (cx - 0.1 - lw >= qx0 + 0.04) { bx = cx - 0.1 - lw; al = 'right'; }
-        else { const bw = Math.min(qx1 - qx0 - 0.1, Math.max(1.0, lw)); bx = Math.max(qx0 + 0.05, Math.min(cx - bw / 2, qx1 - 0.05 - bw)); al = 'center'; by = cy + 0.1; bh = 0.4; }
+        else {
+          // di bawah atau di atas titik, tetap di dalam kuadran tegaknya
+          const bw = Math.min(qx1 - qx0 - 0.1, Math.max(1.0, lw)), qy0 = p.y >= 0.5 ? py : py + hh, qy1 = p.y >= 0.5 ? py + hh : py + ph;
+          bx = Math.max(qx0 + 0.05, Math.min(cx - bw / 2, qx1 - 0.05 - bw)); al = 'center'; bh = 0.38;
+          by = cy + 0.1 + bh <= qy1 - 0.03 ? cy + 0.1 : cy - 0.1 - bh;
+          if (by < qy0 + 0.02) warn(`matrix: label "${plain(p.label)}" tidak muat di kuadrannya — persingkat atau geser titik.`);
+        }
         s.addText(plain(p.label), base({ x: bx, y: by, w: al === 'center' ? Math.min(qx1 - qx0 - 0.1, Math.max(1.0, lw)) : lw, h: bh, fontSize: V.desc, bold: on, color: TEXT, align: al, valign: al === 'center' ? 'top' : 'middle', objectName: `matriks-titik-${i + 1}-label` }));
       });
       if (explanation) {
@@ -345,19 +353,21 @@ function build(ctx) {
     architecture({ chapter, title: t, caption, nodes = [], links = [], boundary, columns, legend, source: src, notes } = {}) {
       if (nodes.length > 9) warn(`architecture: ${nodes.length} elemen; maksimal 9 (6 kontainer + 3 luar) — pecah diagram.`);
       const showLegend = legend !== undefined ? legend : !columns;
-      const s = add('NEURON_ISI', notes);
-      head(s, 'architecture', chapter, t);
       // grid 4 kolom; celah antarkolom 0,8 / 1,0 / 1,2" untuk label garis 9 pt; baris 1–3
       const COLX = [0.5, 2.8, 5.3, 8.0], NW = 1.5;
       const R = Math.max(1, ...nodes.map((n) => (n.row || 0) + (n.rowSpan || 1)));
       if (R > 3) throw new Error('[neuron_theme] architecture: maksimal 3 baris (row 0..2).');
-      const top = Z.bodyY + (caption ? 0.3 : 0) + (columns ? 0.3 : 0) + (boundary ? 0.32 : 0.05);
-      const bottomLimit = bottomOf(src) - (showLegend ? 0.3 : 0) - (boundary ? 0.15 : 0);
-      // tinggi simpul & jarak baris: celah antarbaris minimal 0,4" (panah + label); simpul diperkecil bila perlu
-      const GAPMIN = 0.4;
+      const top = Z.bodyY + (caption ? 0.26 : 0) + (columns ? 0.28 : 0) + (boundary ? 0.28 : 0.05);
+      const bottomLimit = bottomOf(src) - (showLegend ? 0.25 : 0) - (boundary ? 0.1 : 0);
+      // tinggi simpul & jarak baris: celah antarbaris minimal 0,35" (panah + label); simpul diperkecil bila perlu
+      const GAPMIN = 0.35;
       let NH = R === 3 ? 0.58 : 0.8;
       if (R > 1 && (bottomLimit - top - R * NH) / (R - 1) < GAPMIN) NH = (bottomLimit - top - (R - 1) * GAPMIN) / R;
-      if (NH < 0.42) throw new Error(`[neuron_theme] architecture: ${R} baris tidak muat (simpul ${NH.toFixed(2)}") — hapus caption/columns/legend/source atau kurangi baris.`);
+      if (NH < 0.4) throw new Error(`[neuron_theme] architecture: ${R} baris tidak muat (simpul ${NH.toFixed(2)}") — kurangi baris, atau hilangkan columns/source (C4 kontainer 3 baris muat dengan caption + batas + kunci).`);
+      if (boundary) {
+        const [a, b] = boundary.cols || [1, 2];
+        if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 0 && b <= 3 && a <= b)) throw new Error(`[neuron_theme] architecture: boundary.cols [${a}, ${b}] harus 0 ≤ a ≤ b ≤ 3.`);
+      }
       const step = R > 1 ? Math.min(1.25, (bottomLimit - top - NH) / (R - 1)) : 0;
       const pos = {};
       nodes.forEach((nd, i) => {
@@ -365,26 +375,39 @@ function build(ctx) {
         const cs = nd.colSpan || 1, rs = nd.rowSpan || 1;
         if (!(Number.isInteger(nd.col) && Number.isInteger(nd.row) && nd.col >= 0 && nd.col + cs <= 4 && nd.row >= 0 && nd.row + rs <= 3)) throw new Error(`[neuron_theme] architecture: ${nd.id} di luar grid (col 0..3, row 0..2).`);
         if (pos[nd.id]) throw new Error(`[neuron_theme] architecture: id "${nd.id}" ganda.`);
-        // "sistem kami" yang membentang beberapa sel (diagram konteks) dibuat ringkas (maks. 2,4" × 1,0") di tengah bentangnya;
+        // "sistem kami" yang membentang beberapa sel (diagram konteks) dibuat ringkas (maks. 2,4" × 1,0") di tengah bentangnya —
+        // tingginya hanya diringkas bila setiap simpul tetangga di kiri/kanan masih sejajar ≥ 0,2" (garis tetap lurus);
         // simpul lain mengisi bentangnya penuh agar garis dari tiap baris tetap lurus (alur data)
         const sx = COLX[nd.col], sy = top + nd.row * step, sw = COLX[nd.col + cs - 1] + NW - sx, sh = (rs - 1) * step + NH;
-        const compact = nd.kind === 'main' && (cs > 1 || rs > 1);
-        const w = compact ? Math.min(sw, 2.4) : sw, h = compact ? Math.min(sh, Math.max(NH, 1.0)) : sh;
+        const isMain = nd.kind === 'main' && (cs > 1 || rs > 1);
+        const w = isMain ? Math.min(sw, 2.4) : sw;
+        let h = sh;
+        if (isMain && rs > 1) {
+          const ch = Math.min(sh, Math.max(NH, 1.0)), cy0 = sy + (sh - ch) / 2;
+          const peers = links.filter((l) => l.from === nd.id || l.to === nd.id).map((l) => nodes.find((m) => m.id === (l.from === nd.id ? l.to : l.from))).filter(Boolean);
+          const ok = peers.every((m) => { const my = top + m.row * step, mh = ((m.rowSpan || 1) - 1) * step + NH; return Math.min(cy0 + ch, my + mh) - Math.max(cy0, my) >= 0.2; });
+          if (ok) h = ch;
+        }
         pos[nd.id] = { ...nd, x: sx + (sw - w) / 2, y: sy + (sh - h) / 2, w, h };
       });
+      links.forEach((l, i) => {
+        if (!pos[l.from] || !pos[l.to]) throw new Error(`[neuron_theme] architecture: link ${i + 1} merujuk simpul yang tidak ada (${l.from} → ${l.to}).`);
+        if (l.from === l.to) throw new Error(`[neuron_theme] architecture: link ${i + 1} dari "${l.from}" ke dirinya sendiri.`);
+      });
+      const s = add('NEURON_ISI', notes);
+      head(s, 'architecture', chapter, t);
       const ids = Object.keys(pos);
       ids.forEach((a, i) => ids.slice(i + 1).forEach((b) => {
         const A = pos[a], B = pos[b];
         if (A.x < B.x + B.w && B.x < A.x + A.w && A.y < B.y + B.h && B.y < A.y + A.h) warn(`architecture: simpul "${a}" dan "${b}" bertumpuk — pindahkan col/row.`);
       }));
       let hy = Z.bodyY;
-      if (caption) { s.addText(caption, base({ x: M, y: hy, w: W, h: 0.22, fontSize: V.desc, bold: true, color: MUTED, valign: 'middle', objectName: 'diagram-judul' })); hy += 0.3; }
+      if (caption) { s.addText(caption, base({ x: M, y: hy, w: W, h: 0.22, fontSize: V.desc, bold: true, color: MUTED, valign: 'middle', objectName: 'diagram-judul' })); hy += 0.26; }
       if (columns) columns.forEach((c, i) => s.addText(c, base({ x: COLX[i], y: hy, w: NW, h: 0.22, fontSize: V.tag, bold: true, color: MUTED, valign: 'middle', objectName: `diagram-kolom-${i + 1}` })));
       let bL = null, bR = null;
       if (boundary) {
         const [a, b] = boundary.cols || [1, 2];
-        if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 0 && b <= 3 && a <= b)) throw new Error(`[neuron_theme] architecture: boundary.cols [${a}, ${b}] harus 0 ≤ a ≤ b ≤ 3.`);
-        const bx = COLX[a] - 0.12, bw = COLX[b] + NW + 0.12 - bx, by = top - 0.32, bh = top + (R - 1) * step + NH + 0.15 - by;
+        const bx = COLX[a] - 0.12, bw = COLX[b] + NW + 0.12 - bx, by = top - 0.28, bh = top + (R - 1) * step + NH + 0.1 - by;
         bL = bx; bR = bx + bw;
         s.addShape('rect', { x: bx, y: by, w: bw, h: bh, fill: { type: 'none' }, line: { color: GREY, width: 1, dashType: 'dash' }, objectName: 'diagram-batas' });
         s.addText(boundary.label || '', base({ x: bx + 0.08, y: by + 0.04, w: bw - 0.16, h: 0.18, fontSize: V.tag, color: MUTED, valign: 'top', objectName: 'diagram-batas-label' }));
@@ -421,7 +444,12 @@ function build(ctx) {
           if (Math.abs(y2 - y1) < 0.15 || (down ? y2 < y1 : y2 > y1)) warn(`architecture: garis ${l.from} → ${l.to} terlalu pendek — beri jarak baris lebih besar.`);
           seg(s, x, y1, x, y2, o);
           const txt = [l.label && { text: l.label, options: { breakLine: !!l.protocol } }, l.protocol && { text: `[${l.protocol}]` }].filter(Boolean);
-          if (txt.length) s.addText(txt, base({ x: x + 0.08, y: Math.min(y1, y2), w: 1.5, h: Math.abs(y2 - y1), fontSize: V.tag, color: MUTED, valign: 'middle', objectName: `diagram-aliran-${i + 1}-label` }));
+          // label di kanan garis, dibatasi garis batas sistem; bila sempit (< 0,9") pindah ke kiri garis
+          const need_ = Math.max(plain(l.label || '').length, (l.protocol || '').length + 2) * 0.064 + 0.05;
+          let lx = x + 0.08, lw = 1.5, al = 'left';
+          if (bR !== null && x < bR && x + 0.08 + need_ > bR - 0.05) { lw = Math.max(0, bR - 0.05 - lx); if (lw < need_) { lw = Math.min(1.5, x - 0.08 - ((bL ?? M) + 0.05)); lx = x - 0.08 - lw; al = 'right'; } }
+          if (lw < need_) warn(`architecture: label garis "${l.label}" tidak muat di samping garis tegak — persingkat.`);
+          if (txt.length) s.addText(txt, base({ x: lx, y: Math.min(y1, y2), w: Math.max(0.3, lw), h: Math.abs(y2 - y1), fontSize: V.tag, color: MUTED, align: al, valign: 'middle', objectName: `diagram-aliran-${i + 1}-label` }));
         } else {                                                 // siku Z: keluar sisi samping, belok di tengah celah, masuk sisi samping tujuan
           const ltr = b.x > a.x, down = b.y > a.y;
           const y1 = a.y + a.h * (down ? 0.75 : 0.25), y2 = b.y + b.h / 2;
