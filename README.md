@@ -86,7 +86,7 @@ pptx-neuron/
 │   ├── check_prereqs.sh    ← pengecek prasyarat
 │   ├── sync.sh             ← salin master ke ~/.claude/skills/pptx-neuron
 │   ├── vendor/pptxgenjs.bundle.cjs ← pustaka pptxgenjs dibundel (lisensi: THIRD_PARTY_NOTICES.txt)
-│   └── office/, add_slide.py, clean.py, slide_text.py, thumbnail.py, apply_theme.js  ← alat bawaan skill pptx
+│   └── office/, add_slide.py, clean.py, slide_text.py, thumbnail.py  ← alat bawaan skill pptx (edit & validasi)
 └── tests/uji.sh            ← uji menyeluruh: buat, validasi, baca, edit, render
 ```
 

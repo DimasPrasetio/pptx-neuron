@@ -9,15 +9,16 @@ const { createDeck } = require(path.join(__dirname, 'neuron_theme.js'));
 // Gambar contoh (tiruan dasbor) dibuat di sini agar contoh berjalan tanpa berkas luar. Di presentasi nyata,
 // pakai tangkapan layar atau foto sungguhan: deck.image({ image: 'layar.png', ... }).
 function mockDashboard(file) {
-  const w = 1600, h = 900, px = Buffer.alloc(w * h * 3, 255);
+  const w = 1600, h = 900, px = Buffer.alloc(w * h * 3, 0xf4);   // latar F4F5F7 agar tepi gambar terlihat di slide putih
   const hex = (c) => [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
   const rect = (x, y, rw, rh, c) => { const [r, g, b] = hex(c); for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) { const k = (j * w + i) * 3; px[k] = r; px[k + 1] = g; px[k + 2] = b; } };
   rect(0, 0, 260, h, '2B3440');                                   // menu samping
-  for (let i = 0; i < 6; i++) rect(40, 140 + i * 70, 180, 18, i === 1 ? 'B3121B' : '5B6470');
-  rect(260, 0, w - 260, 90, 'F4F5F7');                             // bilah atas
-  [0, 1, 2].forEach((i) => { rect(320 + i * 420, 140, 380, 160, 'F4F5F7'); rect(350 + i * 420, 175, 160, 22, '5B6470'); rect(350 + i * 420, 220, 220, 50, i === 0 ? 'B3121B' : '1F2937'); });
-  rect(320, 350, 1220, 500, 'F4F5F7');                             // panel grafik
-  [220, 300, 260, 340, 380, 330, 410, 300, 360, 440].forEach((v, i) => rect(380 + i * 112, 800 - v, 70, v, i === 9 ? 'B3121B' : '1F2937'));
+  for (let i = 0; i < 6; i++) rect(40, 140 + i * 70, 180, 18, i === 1 ? 'C9CDD3' : '5B6470');
+  rect(260, 0, w - 260, 90, 'FFFFFF');                             // bilah atas
+  // satu-satunya merah: kartu gudang yang selisihnya di atas batas (disebut di teks slide)
+  [0, 1, 2].forEach((i) => { rect(320 + i * 420, 140, 380, 160, 'FFFFFF'); rect(350 + i * 420, 175, 160, 22, '5B6470'); rect(350 + i * 420, 220, 220, 50, i === 0 ? 'B3121B' : '1F2937'); });
+  rect(320, 350, 1220, 500, 'FFFFFF');                             // panel grafik
+  [220, 300, 260, 340, 380, 330, 410, 300, 360, 440].forEach((v, i) => rect(380 + i * 112, 800 - v, 70, v, '8C939D'));
   const raw = Buffer.alloc((w * 3 + 1) * h);
   for (let j = 0; j < h; j++) px.copy(raw, j * (w * 3 + 1) + 1, j * w * 3, (j + 1) * w * 3);
   const table = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; table[n] = c >>> 0; }
@@ -62,13 +63,13 @@ function mockDashboard(file) {
 
   // 4. Isi poin (+ panel Inti)
   deck.bullets({
-    chapter: '02 · Temuan audit',
+    chapter: '02 · Temuan audit stok',
     title: 'Selisih stok berasal dari pencatatan manual, bukan kehilangan barang',
     bullets: [
       '**71%** selisih muncul saat data kertas disalin ulang',
       'Barang masuk baru tercatat rata-rata **2 hari** setelah tiba',
-      'Tiga gudang memakai kode berbeda untuk satu produk',
-      'Opname bulanan menghentikan pengiriman 3 hari',
+      '**Tiga** gudang memakai kode berbeda untuk satu produk',
+      'Opname bulanan menghentikan pengiriman **3 hari**',
     ],
     keyPoint: 'Memindai barang saat diterima menutup sebagian besar sumber selisih.',
     source: 'Sumber: audit stok tiga gudang PT Contoh Logistik, Agustus–Oktober 2026',
@@ -77,7 +78,7 @@ function mockDashboard(file) {
 
   // 5. Dua kolom
   deck.twoColumn({
-    chapter: '02 · Temuan audit',
+    chapter: '02 · Temuan audit stok',
     title: 'Pemindaian di penerimaan memangkas langkah pencatatan dari lima menjadi dua',
     left: { heading: 'Proses sekarang', bullets: ['Petugas menulis barang masuk di formulir kertas', 'Admin menyalin formulir ke spreadsheet esok harinya', 'Kepala gudang mencocokkan spreadsheet dengan ERP'] },
     right: { heading: 'Proses usulan', bullets: ['Petugas memindai kode barang saat diterima', 'Stok di ERP bertambah saat itu juga', 'Selisih muncul otomatis di dasbor harian'] },
@@ -87,35 +88,36 @@ function mockDashboard(file) {
   // 6. Tabel
   deck.section({ number: '03', title: 'Rencana tiga tahap', description: 'Lingkup, durasi, dan biaya setiap tahap.' });
   deck.table({
-    chapter: '03 · Rencana',
+    chapter: '03 · Rencana tiga tahap',
     title: 'Tiga tahap selesai dalam 20 minggu dengan risiko terkendali',
-    caption: 'Tabel 1 · Tahapan, durasi, dan biaya',
-    head: ['Tahap', 'Lingkup', 'Durasi', 'Biaya (Rp jt)'],
+    caption: 'Tabel 1 · Tahapan, risiko utama, durasi, dan biaya',
+    head: ['Tahap', 'Lingkup', 'Risiko utama → mitigasi', 'Durasi', 'Biaya (Rp jt)'],
     rows: [
-      ['1. Fondasi', 'Kode barang tunggal, pemindai di penerimaan', '6 minggu', '420'],
-      ['2. Integrasi', 'Sinkron dengan ERP dan aplikasi kurir', '8 minggu', '610'],
-      ['3. Otomasi', 'Opname bergilir harian, dasbor selisih', '6 minggu', '380'],
-      ['**Total**', '', '**20 minggu**', '**1.410**'],
+      ['1. Fondasi', 'Kode tunggal, pemindai', 'Kode ganda → bersihkan data', '6 minggu', '420'],
+      ['2. Integrasi', 'Sinkron ERP dan kurir', 'API kurir berubah → adaptor', '8 minggu', '610'],
+      ['3. Otomasi', 'Opname bergilir, dasbor', 'Staf belum terbiasa → pelatihan', '6 minggu', '380'],
+      ['**Total**', '', '', '**20 minggu**', '**1.410**'],
     ],
-    widths: [1.9, 4.3, 1.4, 1.4], align: ['l', 'l', 'r', 'r'],
+    widths: [1.3, 2.2, 3.0, 1.2, 1.3], align: ['l', 'l', 'l', 'r', 'r'],
     source: 'Sumber: estimasi Tim Engineering Neuronworks, harga belum termasuk PPN',
   });
 
   // 7. Grafik (native, bisa diedit di PowerPoint)
   deck.chart({
-    chapter: '03 · Rencana',
+    chapter: '03 · Rencana tiga tahap',
     title: 'Selisih stok turun bertahap hingga di bawah 1% pada akhir tahap 3',
     type: 'column',
     labels: ['Sekarang', 'Tahap 1', 'Tahap 2', 'Tahap 3'],
     series: [{ name: 'Selisih stok (%)', values: [4.8, 2.6, 1.5, 0.8] }],
     numFmt: '0.0"%"',
+    highlight: 3,   // batang Tahap 3 (disebut di judul) merah, lainnya abu
     keyValue: '−83%', keyText: 'Selisih stok turun dari **4,8%** menjadi **0,8%** setelah ketiga tahap berjalan.',
     source: 'Sumber: proyeksi Tim Engineering berdasarkan audit Agustus–Oktober 2026',
   });
 
   // 8. Gambar + keterangan
   deck.image({
-    chapter: '03 · Rencana',
+    chapter: '03 · Rencana tiga tahap',
     title: 'Dasbor selisih menampilkan gudang bermasalah setiap pagi',
     image: gambar, alt: 'Tiruan dasbor selisih stok: tiga kartu ringkasan dan grafik batang selisih harian',
     caption: 'Gambar 1 · Rancangan dasbor selisih harian',
@@ -125,7 +127,7 @@ function mockDashboard(file) {
   // 9. Angka penting
   deck.section({ number: '04', title: 'Biaya dan dampak' });
   deck.stats({
-    chapter: '04 · Dampak',
+    chapter: '04 · Biaya dan dampak',
     title: 'Investasi kembali dalam 14 bulan dari penghematan selisih dan lembur',
     stats: [
       { value: '14 bln', label: 'Titik balik modal', note: 'Dihitung dari penghematan bulanan Rp 101 jt' },
@@ -138,12 +140,14 @@ function mockDashboard(file) {
 
   // 10. Penutup
   deck.closing({
+    chapter: '05 · Langkah berikutnya',
+    title: 'Tiga keputusan yang kami perlukan bulan ini',
     steps: [
       { text: 'Setujui lingkup dan anggaran tahap 1', owner: 'Direksi PT Contoh Logistik  ·  20 November 2026' },
       { text: 'Tetapkan satu kode barang untuk ketiga gudang', owner: 'Tim gudang + Neuronworks  ·  4 Desember 2026' },
       { text: 'Mulai uji coba pemindai di gudang Cikarang', owner: 'Neuronworks  ·  Januari 2027' },
     ],
-    contact: { name: 'Nama Penanggung Jawab', role: 'Project Manager, Neuronworks Indonesia', email: 'nama@neuronworks.co.id', phone: '+62 21 0000 0000' },
+    contact: { name: 'Nama Penanggung Jawab', role: 'Project Manager · Neuronworks', email: 'nama@neuronworks.co.id', phone: '+62 21 0000 0000' },
   });
 
   await deck.save(out);

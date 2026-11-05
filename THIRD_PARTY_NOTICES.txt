@@ -2,7 +2,7 @@ Pustaka pihak ketiga yang dibundel di scripts/vendor/pptxgenjs.bundle.cjs
 (dibuat dengan esbuild 0.25.5 dari paket npm 'pptxgenjs' 4.0.1 beserta dependensi runtime-nya;
 jszip diekspor juga sebagai PptxGenJS.JSZip). Semua dilisensikan open-source; teks lisensi di bawah.
 
-Skrip di scripts/office/, scripts/add_slide.py, clean.py, slide_text.py, thumbnail.py, dan apply_theme.js
+Skrip di scripts/office/, scripts/add_slide.py, clean.py, slide_text.py, dan thumbnail.py
 berasal dari skill pptx Anthropic (lihat LICENSE.txt).
 
 ================ pptxgenjs 4.0.1 (MIT) ================

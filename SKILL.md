@@ -67,7 +67,7 @@ deck.image({ chapter, title, image: 'layar.png', alt: 'Deskripsi gambar', captio
 deck.stats({ chapter, title, stats: [{ value: '92%', label: 'Label', note: 'Keterangan' }], highlight: 0, source: 'Sumber: …' });
 deck.closing({ steps: [{ text: 'Langkah', owner: 'Pemilik · tanggal' }], contact: { name, role, email, phone } });
 
-await deck.save('output.pptx');      // menulis, merapikan XML paragraf, dan menerapkan tema warna Neuron
+const file = await deck.save('output.pptx');   // menulis, merapikan XML, menerapkan tema warna Neuron; mengembalikan path berkas
 ```
 
 Referensi jenis slide:
@@ -80,7 +80,7 @@ Referensi jenis slide:
 | `bullets` | Isi poin | `bullets` (maks. 5, idealnya 1 baris), `keyPoint` (panel "Inti" kanan, opsional) |
 | `twoColumn` | Dua kolom | `left`/`right` = `{ heading, bullets }`; `recommend: 'left' | 'right'` memberi panel + label "Rekomendasi" |
 | `table` | Tabel | `head`, `rows`, `widths` (inci, jumlah 9,0), `align` (`'l' | 'c' | 'r'`), `caption`; maks. 7 baris data (8 tanpa caption) |
-| `chart` | Grafik | `type`: `column`, `bar`, `line`, `doughnut`; `series` maks. 4; `focus` = seri merah (bawaan: seri 0 bila > 1 seri); `keyValue` + `keyText` = panel angka kanan |
+| `chart` | Grafik | `type`: `column`, `bar`, `line`, `doughnut`; `series` maks. 4; `focus` = seri merah (bawaan: seri 0 bila > 1 seri, `-1` = tanpa sorotan); satu seri batang/kolom: `highlight` = indeks kategori merah (yang disebut di judul), lainnya abu; `keyValue` + `keyText` = panel angka kanan (angka gelap bila grafik sudah memuat merah); `numFmt` format angka (ditampilkan gaya Indonesia: 4,8 / 1.410) |
 | `image` | Gambar + keterangan | `image` (PNG/JPEG), `alt` (wajib), `caption`, `bullets` (maks. 3), `wide: true` untuk tangkapan layar lebar |
 | `stats` | Angka penting | `stats` maks. 3 `{ value, label, note }`; `highlight` = angka merah (yang disebut di judul); satu angka + `explanation` = varian besar |
 | `closing` | Penutup | `steps` maks. 4 (string atau `{ text, owner }`), `contact`; membuka *section* "Penutup" |
@@ -92,7 +92,9 @@ Aturan pemakaian:
 - Satu pesan per slide. Judul = kesimpulannya ("Pendapatan Q3 naik 18%"), bukan topiknya ("Pendapatan").
 - Penjelasan panjang masuk `notes`, bukan ke slide.
 - Tema mencetak peringatan `[neuron_theme] …` bila teks diperkirakan meluap, terlalu banyak poin/baris/seri, judul > 2 baris, judul bertitik, atau gambar tanpa alt. **Jangan abaikan**: persingkat, pecah slide, atau lanjutkan tabel di slide "(lanjutan)" dengan header yang sama. Jangan mengecilkan huruf di bawah skala tema.
-- Spasi antara angka dan satuannya ("Rp 101 jt", "14 bln") otomatis dibuat tak-putus.
+- Spasi antara angka dan satuannya ("Rp 101 jt", "14 bln") otomatis dibuat tak-putus; judul sampul 2 baris dipecah seimbang.
+- Bagian (*section*) PowerPoint dibuat otomatis: "Pembuka", satu per `section()`, dan "Penutup" — panel slide PowerPoint rapi per bab.
+- Input wajib yang kosong (judul, `series`, `head`, nilai angka) atau tidak cocok (jumlah sel ≠ kolom header, `focus`/`highlight` di luar rentang) menghentikan skrip dengan pesan `[neuron_theme] …` — perbaiki isinya, jangan dibungkam.
 - Grafik selalu native (bisa diedit di PowerPoint). Hanya jenis yang tidak ada di PowerPoint (Sankey, jaringan) yang boleh berupa gambar.
 - Jenis presentasi lain (proposal, pelatihan, laporan) memakai modul yang sama; ubah hanya `cover.type`, `footerLabel`, dan isi.
 
@@ -154,4 +156,4 @@ python3 scripts/office/validate.py out.pptx --original deck.pptx
 
 ## Pemeliharaan skill
 
-Folder master: `~/Documents/Neuron/ai-agent/pptx-neuron`. Edit hanya di master, uji dengan `bash tests/uji.sh`, commit, lalu salin ke Claude dengan `bash scripts/sync.sh`.
+Folder master: `~/Documents/Neuron/ai-agent/pptx-neuron`. Edit hanya di master, uji dengan `bash tests/uji.sh` (buat, input tepi, validasi, baca, edit, render, pengaman sync), commit, lalu salin ke Claude dengan `bash scripts/sync.sh` (hanya mau menyalin ke folder bernama `pptx-neuron`).

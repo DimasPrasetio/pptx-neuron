@@ -18,6 +18,11 @@ node "$S/example.js" "$OUT/contoh.pptx" > "$OUT/build.log" 2>&1 || { cat "$OUT/b
 grep -q '\[neuron_theme\]' "$OUT/build.log" && { cat "$OUT/build.log"; gagal "contoh memicu peringatan tema"; }
 ok "contoh dibuat tanpa peringatan"
 
+echo "1b. Input tepi & regresi tinjauan"
+node "$ROOT/tests/tepi.js" "$OUT/tepi" || gagal "tests/tepi.js"
+python3 "$S/office/validate.py" "$OUT/tepi/tepi.pptx" | tail -1 | grep -q PASSED || gagal "validate.py deck tepi"
+ok "deck tepi valid"
+
 echo "2. Validasi struktur"
 python3 "$S/office/validate.py" "$OUT/contoh.pptx" | tail -1 | grep -q PASSED || gagal "validate.py contoh"
 ok "validate.py"
@@ -75,8 +80,18 @@ echo "5. Render"
 if bash "$S/render.sh" "$OUT/edit.pptx" "$OUT/render" > "$OUT/render.log" 2>&1; then
   n=$(ls "$OUT"/render/slide-*.jpg | wc -l | tr -d ' ')
   [ "$n" = 12 ] || gagal "render menghasilkan $n gambar, harus 12"
+  [ "$OUT/render/edit.pdf" -nt "$OUT/edit.pptx" ] || gagal "PDF render lebih lama dari berkas"
   ok "render 12 slide -> $OUT/render/"
 else
   code=$?; [ $code -eq 2 ] && echo "  [LEWAT] LibreOffice/Poppler tidak ada: tampilan belum diperiksa" || { cat "$OUT/render.log"; gagal "render.sh"; }
 fi
+echo "6. Pengaman sync.sh"
+rm -rf "$OUT/skills"; mkdir -p "$OUT/skills/lain"; echo "name: lain" > "$OUT/skills/lain/SKILL.md"
+bash "$S/sync.sh" "$OUT/skills" > /dev/null 2>&1 && gagal "sync.sh ke folder induk seharusnya ditolak"
+[ -f "$OUT/skills/lain/SKILL.md" ] || gagal "sync.sh menghapus skill lain"
+mkdir -p "$OUT/skills2/pptx-neuron"; printf -- "---\nname: bukan-ini\n---\n" > "$OUT/skills2/pptx-neuron/SKILL.md"
+bash "$S/sync.sh" "$OUT/skills2/pptx-neuron" > /dev/null 2>&1 && gagal "sync.sh ke skill lain seharusnya ditolak"
+bash "$S/sync.sh" "$OUT/skills/pptx-neuron" > /dev/null || gagal "sync.sh ke tujuan sah"
+[ -f "$OUT/skills/pptx-neuron/SKILL.md" ] && [ ! -d "$OUT/skills/pptx-neuron/tests" ] && [ -f "$OUT/skills/lain/SKILL.md" ] || gagal "hasil sync.sh"
+ok "sync.sh menolak folder induk/skill lain dan menyalin ke tujuan sah"
 echo "Semua uji lulus."
