@@ -30,6 +30,10 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
   throws(() => d0.architecture({ title: 'x', nodes: [{ id: 'a', title: 'A', col: 0, row: 0 }], links: [{ from: 'a', to: 'a' }] }), /dirinya sendiri/, 'link ke diri sendiri');
   throws(() => d0.architecture({ title: 'x', boundary: { cols: [2, 1] }, nodes: [{ id: 'a', title: 'A', col: 0, row: 0 }] }), /boundary\.cols/, 'batas terbalik');
   throws(() => d0.timeline({ title: 'x', periods: ['a', 'b'], phases: [{ name: 'p', start: 0, end: 1 }], today: 9 }), /today 9/, 'today di luar kisi');
+  throws(() => d0.architecture({ title: 'x', caption: 'c', boundary: { label: 'b', cols: [1, 2] }, source: 's',
+    nodes: [{ id: 'w', title: 'Aplikasi pemindai', tag: 'Kontainer · React', desc: 'Pindai & cari barang', col: 1, row: 0 },
+      { id: 'a', title: 'API inventori', tag: 'Kontainer · Go', desc: 'Aturan stok dan opname', kind: 'main', col: 1, row: 1 },
+      { id: 'd', title: 'Basis data', tag: 'Kontainer · MySQL', kind: 'db', col: 1, row: 2 }] }), /isi simpul .* tidak muat/, 'C4 3 baris berisi panjang');
   ok('input wajib kosong/salah memberi galat yang jelas');
   // format angka label di luar grafik
   assert.strictEqual(T.formatNum(0.048, '0.0%'), '4,8%');
@@ -68,6 +72,12 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
   d.architecture({ title: 'Konteks tiga baris', nodes: [0, 1, 2].map((r) => ({ id: `o${r}`, title: `Orang ${r}`, kind: 'person', col: 0, row: r }))
       .concat([{ id: 'sys', title: 'Sistem', kind: 'main', col: 1, colSpan: 2, row: 0, rowSpan: 3 }, { id: 'e0', title: 'Luar', kind: 'external', col: 3, row: 0 }]),
     links: [0, 1, 2].map((r) => ({ from: `o${r}`, to: 'sys', label: 'Memakai' })).concat([{ from: 'sys', to: 'e0', label: 'Kirim' }]) });
+  // dua garis tegak berdampingan di pita baris yang sama: label tidak boleh saling menimpa
+  warnings.length = 0;
+  d.architecture({ title: 'Label tegak berdampingan', boundary: { label: 'Batas', cols: [1, 2] },
+    nodes: [{ id: 'w', title: 'Web', col: 1, row: 0 }, { id: 'q', title: 'Antrean', col: 1, row: 1 }, { id: 'a', title: 'API', kind: 'main', col: 2, row: 0 }, { id: 'db', title: 'DB', kind: 'db', col: 2, row: 1 }],
+    links: [{ from: 'w', to: 'q', label: 'Mengirim pesanan' }, { from: 'a', to: 'db', label: 'Menyimpan stok' }] });
+  const vw = warnings.slice();
   d.pyramid({ title: 'Piramida', layers: ['A', 'B', 'C'] });
   d.funnel({ title: 'Corong dengan nol', stages: [{ name: 'a', value: 10 }, { name: 'b', value: 0 }, { name: 'c', value: 0 }] });
   d.closing({ steps: ['Satu'] });
@@ -94,7 +104,14 @@ const ok = (m) => { n++; origWarn.call(console, `  [LULUS] ${m}`); };
   for (const m of ar.matchAll(/name="diagram-aliran-\d+(?:-\d+)?"[\s\S]*?<a:xfrm( flipV="1")?( flipH="1")?[^>]*>/g)) assert(!m[1], 'panah vertikal arsitektur tidak terbalik');
   const cx3 = bySlideTitle('Konteks tiga baris');
   assert(cx3 && !/diagram-aliran-\d+-2"/.test(cx3), 'konteks 3 baris: semua garis lurus (tanpa siku)');
-  ok('donat focus 1 / -1, piramida custGeom, arsitektur 3 baris (C4 + konteks) rapi, tanpa NaN/undefined');
+  const lt = bySlideTitle('Label tegak berdampingan');
+  const boxes = [...lt.matchAll(/name="diagram-aliran-\d+-label"[\s\S]*?<a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>[\s\S]*?algn="(\w+)"/g)];
+  assert(boxes.length === 2, 'dua label tegak');
+  assert(!vw.some((w) => /tidak muat di samping garis tegak/.test(w)), `label tegak wajar harus muat: ${vw.join(' | ')}`);
+  // rentang teks nyata: kiri-rata mulai di off.x, kanan-rata berakhir di off.x+cx — keduanya tidak boleh tumpang tindih
+  const ext = boxes.map((m) => { const x = +m[1] / 914400, w = +m[3] / 914400, tw = 1.0; return m[5] === 'r' ? [x + w - tw, x + w] : [x, x + tw]; }).sort((p, q) => p[0] - q[0]);
+  assert(ext[0][1] <= ext[1][0] + 0.06, `label tegak bertumpuk: ${JSON.stringify(ext)}`);
+  ok('donat focus 1 / -1, piramida custGeom, arsitektur 3 baris (C4 + konteks) rapi, label tegak tidak bertumpuk, tanpa NaN/undefined');
   ok(`section PowerPoint: ${sections.map(([s, c]) => `${s}=${c}`).join(', ')}`);
 
   const app = await read('docProps/app.xml');

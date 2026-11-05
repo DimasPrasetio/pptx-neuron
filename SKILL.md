@@ -132,8 +132,10 @@ Alasan & sumber: brief desain proyek ini, bagian "Visualisasi".
 | | `architecture({ columns: ['Sumber', 'Proses', 'Simpan', 'Keluaran'], … })` | alur data kiri → kanan, ≤ 3 simpul per kolom | label garis = nama data yang mengalir; satu jalur `focus` |
 
 Diagram arsitektur: label garis konteks/kontainer = kata kerja + objek ("Mencatat barang", ± 14 karakter per celah);
-"sistem kami" yang membentang beberapa sel dibuat ringkas di tengah bentangnya; 3 baris + keterangan + batas sistem +
-kunci + sumber sekaligus tidak muat — tema berhenti dengan pesan (hapus salah satunya).
+"sistem kami" yang membentang beberapa sel dibuat ringkas bila garis dari tetangganya tetap lurus. Pada 3 baris simpul
+menjadi lebih pendek (± 0,4–0,5"): bila judul + tag + deskripsi tidak muat, tema berhenti dengan pesan — persingkat
+deskripsi, hilangkan `source`/`columns`, atau pakai 2 baris. Label dua garis tegak yang berdampingan saling menghindar;
+bila tetap tidak muat, tema memperingatkan agar label dipersingkat.
 
 Aturan pemakaian visual:
 - Satu visual dominan per slide; judul aksi menyebut apa yang disorot ("Medan menyumbang selisih terbesar" → `highlight` Medan).

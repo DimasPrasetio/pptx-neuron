@@ -23,8 +23,13 @@ function build(ctx) {
   function path(s, pts, o = {}) {
     for (let i = 1; i < pts.length; i++) seg(s, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], { ...o, arrow: !!o.arrow && i === pts.length - 1, name: `${o.name || 'diagram-garis'}-${i}` });
   }
+  // Tinggi isi simpul (judul 12 pt tebal + tag 9 pt + deskripsi 9 pt) termasuk bantalan atas/bawah.
+  const nodeNeed = ({ w, title, tag, desc, kind }) => (kind === 'db' ? 0.14 : 0.06) + 0.04
+    + (lines(title, w - 0.16, V.node, true) * V.node * 1.2 + (tag ? lines(`[${tag}]`, w - 0.16, V.tag) * V.tag * 1.2 : 0)
+      + (desc ? lines(desc, w - 0.16, V.tag) * V.tag * 1.2 : 0)) / 72;
   // Simpul: kotak dengan judul + (tag) + deskripsi. kind: 'node' | 'main' | 'external' | 'person' | 'db'
   function node(s, { x, y, w, h, title, tag, desc, kind = 'node', focus = false, name = 'diagram-simpul', alt }) {
+    if (nodeNeed({ w, title, tag, desc, kind }) > h + 0.02) warn(`diagram: isi simpul "${plain(title)}" diperkirakan tidak muat (${h.toFixed(2)}") — persingkat judul/deskripsi.`);
     const dark = kind === 'main';
     const fill = dark ? INK : kind === 'external' ? WHITE : ZEBRA;
     const line = kind === 'external' ? { color: GREY, width: 1 } : focus ? { color: ACC, width: 1.5 } : { type: 'none' };
@@ -133,6 +138,11 @@ function build(ctx) {
       if (!milestones && !phases) throw new Error('[neuron_theme] timeline: isi milestones atau phases.');
       if (phases && !periods.length) throw new Error('[neuron_theme] timeline: phases butuh periods.');
       if (phases && today !== undefined && !(today >= 0 && today <= periods.length)) throw new Error(`[neuron_theme] timeline: today ${today} di luar 0..${periods.length}.`);
+      (milestones || []).forEach((m, i) => need(m && m.label, `timeline: milestones[${i}].label`));
+      (phases || []).forEach((ph, i) => {
+        need(ph && ph.name, `timeline: phases[${i}].name`);
+        if (!(ph.start >= 0 && ph.end > ph.start && ph.end <= periods.length)) throw new Error(`[neuron_theme] timeline: fase ${i + 1} start/end di luar 0..${periods.length}.`);
+      });
       const s = add('NEURON_ISI', notes);
       head(s, 'timeline', chapter, t);
       const bottom = keyPoint ? keyPanel(s, src, keyPoint) : bottomOf(src);
@@ -299,6 +309,7 @@ function build(ctx) {
     // points: [{ label, x, y }] dengan x,y 0..1; focus: titik merah; explanation: teks atau daftar poin kanan (14 pt).
     matrix({ chapter, title: t, axes = {}, quadrants = {}, best = 'tr', points = [], focus, explanation, source: src, notes } = {}) {
       if (points.length > 10) warn(`matrix: ${points.length} titik; maksimal 10.`);
+      points.forEach((p, i) => { if (!(p && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1)) throw new Error(`[neuron_theme] matrix: titik ${i + 1} di luar 0..1.`); });
       const s = add('NEURON_ISI', notes);
       head(s, 'matrix', chapter, t);
       const ax = axes.x || {}, ay = axes.y || {};
@@ -390,6 +401,11 @@ function build(ctx) {
         }
         pos[nd.id] = { ...nd, x: sx + (sw - w) / 2, y: sy + (sh - h) / 2, w, h };
       });
+      Object.values(pos).forEach((p) => {
+        const kind = p.kind === 'container' || p.kind === 'person' ? 'node' : p.kind || 'node';
+        const needH = nodeNeed({ ...p, kind });
+        if (needH > p.h + 0.02) throw new Error(`[neuron_theme] architecture: isi simpul "${p.id}" tidak muat (perlu ± ${needH.toFixed(2)}", ada ${p.h.toFixed(2)}") — persingkat judul/desc, hilangkan source/columns, atau pakai 2 baris.`);
+      });
       links.forEach((l, i) => {
         if (!pos[l.from] || !pos[l.to]) throw new Error(`[neuron_theme] architecture: link ${i + 1} merujuk simpul yang tidak ada (${l.from} → ${l.to}).`);
         if (l.from === l.to) throw new Error(`[neuron_theme] architecture: link ${i + 1} dari "${l.from}" ke dirinya sendiri.`);
@@ -419,6 +435,7 @@ function build(ctx) {
         node(s, { ...p, title: nd.title, tag: nd.tag, desc: nd.desc, kind, focus: !!nd.focus, name: `diagram-${nd.id}`, alt: i === 0 ? alt : undefined });
       });
       const ov = (a1, a2, b1, b2) => [Math.max(a1, b1), Math.min(a2, b2)];
+      const vlab = [];   // label garis tegak yang sudah ditempatkan: { x0, x1, y0, y1 } (rentang teks nyata)
       links.forEach((l, i) => {
         const a = pos[l.from], b = pos[l.to];
         if (!a || !b) throw new Error(`[neuron_theme] architecture: link ${i + 1} merujuk simpul yang tidak ada (${l.from} → ${l.to}).`);
@@ -446,10 +463,17 @@ function build(ctx) {
           const txt = [l.label && { text: l.label, options: { breakLine: !!l.protocol } }, l.protocol && { text: `[${l.protocol}]` }].filter(Boolean);
           // label di kanan garis, dibatasi garis batas sistem; bila sempit (< 0,9") pindah ke kiri garis
           const need_ = Math.max(plain(l.label || '').length, (l.protocol || '').length + 2) * 0.064 + 0.05;
-          let lx = x + 0.08, lw = 1.5, al = 'left';
-          if (bR !== null && x < bR && x + 0.08 + need_ > bR - 0.05) { lw = Math.max(0, bR - 0.05 - lx); if (lw < need_) { lw = Math.min(1.5, x - 0.08 - ((bL ?? M) + 0.05)); lx = x - 0.08 - lw; al = 'right'; } }
-          if (lw < need_) warn(`architecture: label garis "${l.label}" tidak muat di samping garis tegak — persingkat.`);
-          if (txt.length) s.addText(txt, base({ x: lx, y: Math.min(y1, y2), w: Math.max(0.3, lw), h: Math.abs(y2 - y1), fontSize: V.tag, color: MUTED, align: al, valign: 'middle', objectName: `diagram-aliran-${i + 1}-label` }));
+          const ly0 = Math.min(y1, y2), ly1 = Math.max(y1, y2);
+          const near = vlab.filter((v) => v.y0 < ly1 && v.y1 > ly0);   // label tegak lain di pita baris yang sama
+          // batas kanan: garis batas sistem dan awal label tetangga di kanan; batas kiri: garis batas dan akhir label tetangga di kiri
+          const rightLim = Math.min(bR !== null && x < bR ? bR - 0.05 : M + W, ...near.filter((v) => v.x0 > x).map((v) => v.x0 - 0.05));
+          const leftLim = Math.max(bL !== null && x > bL ? bL + 0.05 : M, ...near.filter((v) => v.x1 < x).map((v) => v.x1 + 0.05));
+          let lx = x + 0.08, lw = Math.min(1.5, rightLim - lx), al = 'left';
+          if (lw < need_) { const lwL = Math.min(1.5, x - 0.08 - leftLim); if (lwL > lw) { lw = lwL; lx = x - 0.08 - lw; al = 'right'; } }
+          if (lw < need_) warn(`architecture: label garis "${l.label}" tidak muat di samping garis tegak (ruang ${Math.max(0, lw).toFixed(2)}") — persingkat.`);
+          const tw = Math.min(need_, Math.max(0, lw));
+          vlab.push(al === 'left' ? { x0: lx, x1: lx + tw, y0: ly0, y1: ly1 } : { x0: lx + lw - tw, x1: lx + lw, y0: ly0, y1: ly1 });
+          if (txt.length) s.addText(txt, base({ x: lx, y: ly0, w: Math.max(0.3, lw), h: ly1 - ly0, fontSize: V.tag, color: MUTED, align: al, valign: 'middle', objectName: `diagram-aliran-${i + 1}-label` }));
         } else {                                                 // siku Z: keluar sisi samping, belok di tengah celah, masuk sisi samping tujuan
           const ltr = b.x > a.x, down = b.y > a.y;
           const y1 = a.y + a.h * (down ? 0.75 : 0.25), y2 = b.y + b.h / 2;
